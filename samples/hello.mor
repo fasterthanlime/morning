@@ -1,0 +1,5 @@
+import System.IO
+
+fn Main
+    IO.Println("Hello world")
+end
