@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33.0"
-pest = "2.1.2"
+nom = "5.0.1"
+colored = "1.8.0"

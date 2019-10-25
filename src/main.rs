@@ -1,3 +1,7 @@
+mod ast;
+mod checker;
+mod parser;
+
 use clap::{App, Arg};
 
 fn main() {
