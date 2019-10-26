@@ -130,7 +130,7 @@ where
 }
 
 pub fn parse(source: Rc<Source>) -> Result<ast::Unit, Error> {
-    do_parse(source, parser::file::<VerboseError<parser::Span>>)
+    do_parse(source, parser::unit)
 }
 
 pub struct Diagnostic<'a> {
