@@ -50,6 +50,7 @@ pub struct VariableDeclaration {
 #[derive(Debug, Clone)]
 pub enum Expression {
     Call(Call),
+    BinaryExpression(BinaryExpresion),
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     FloatingLiteral(FloatingLiteral),
@@ -99,4 +100,19 @@ pub struct TypeReference {
 pub struct Call {
     pub target: Box<Expression>,
     pub args: Vec<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BinaryExpresion {
+    pub operator: BinaryOperator,
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub enum BinaryOperator {
+    Plus,
+    Minus,
+    Mul,
+    Div,
 }

@@ -96,7 +96,7 @@ fn expression(i: Span) -> Res<Expression> {
     let (mut i, mut expr) = inner_expression(i)?;
 
     loop {
-        match binary_expression(expr.clone(), i.clone()) {
+        match postfix_expression(expr.clone(), i.clone()) {
             Ok((i2, expr2)) => {
                 i = i2;
                 expr = expr2;
@@ -115,11 +115,14 @@ fn inner_expression(i: Span) -> Res<Expression> {
     )))(i)
 }
 
-fn binary_expression(lhs: Expression, i: Span) -> Res<Expression> {
-    map(call(lhs), Expression::Call)(i)
+fn postfix_expression(lhs: Expression, i: Span) -> Res<Expression> {
+    alt((
+        map(call(&lhs), Expression::Call),
+        map(binary_expression(&lhs), Expression::BinaryExpression),
+    ))(i)
 }
 
-fn call(target: Expression) -> impl Fn(Span) -> Res<Call> {
+fn call<'a>(target: &'a Expression) -> impl Fn(Span) -> Res<Call> + 'a {
     move |i| {
         let (i, args) = delimited(stag("("), separated_list(stag(","), expression), stag(")"))(i)?;
 
@@ -129,6 +132,28 @@ fn call(target: Expression) -> impl Fn(Span) -> Res<Call> {
         };
         Ok((i, c))
     }
+}
+
+fn binary_expression<'a>(lhs: &'a Expression) -> impl Fn(Span) -> Res<BinaryExpresion> + 'a {
+    move |i| {
+        let (i, operator) = spaced(binary_operator)(i)?;
+        let (i, rhs) = spaced(expression)(i)?;
+        let bo = BinaryExpresion {
+            lhs: Box::new(lhs.clone()),
+            operator,
+            rhs: Box::new(rhs),
+        };
+        Ok((i, bo))
+    }
+}
+
+fn binary_operator(i: Span) -> Res<BinaryOperator> {
+    alt((
+        map(tag("+"), |_| BinaryOperator::Plus),
+        map(tag("-"), |_| BinaryOperator::Minus),
+        map(tag("*"), |_| BinaryOperator::Mul),
+        map(tag("/"), |_| BinaryOperator::Div),
+    ))(i)
 }
 
 fn float_lit(i: Span) -> Res<FloatingLiteral> {

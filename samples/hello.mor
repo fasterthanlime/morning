@@ -6,11 +6,11 @@ fn main() {
     // let z = .45;
     // let w = 0.;
 
-    print(x);
-    print(x)(a, b, c);
-    print(x)();
-    print(a, b, c);
-    print();
+    // print(x);
+    // print(x)(a, b, c);
+    // print(x)();
+    // print(a, b, c);
+    // print();
 
-    // let x = 1 + 2;
+    let x = 1 + 2;
 }
