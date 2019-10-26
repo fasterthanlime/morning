@@ -70,12 +70,13 @@ fn block(i: Span) -> Res<Block> {
 }
 
 fn statement(i: Span) -> Res<Statement> {
-    spaced(alt((
-        map(var_decl, |vd| Statement::VariableDeclaration(vd)),
-        map(terminated(expression, spaced(tag(";"))), |ex| {
-            Statement::Expression(ex)
-        }),
-    )))(i)
+    terminated(
+        spaced(alt((
+            map(var_decl, |vd| Statement::VariableDeclaration(vd)),
+            map(expression, |ex| Statement::Expression(ex)),
+        ))),
+        spaced(tag(";")),
+    )(i)
 }
 
 fn var_decl(i: Span) -> Res<VariableDeclaration> {

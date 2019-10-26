@@ -1,5 +1,5 @@
  
 // Our main function
 fn main() {
-    let x = 43
+    let x = 43;
 }
