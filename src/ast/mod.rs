@@ -37,6 +37,7 @@ pub struct Block {
 #[derive(Debug)]
 pub enum Statement {
     VariableDeclaration(VariableDeclaration),
+    Expression(Expression),
 }
 
 #[derive(Debug)]
@@ -48,13 +49,20 @@ pub struct VariableDeclaration {
 
 #[derive(Debug)]
 pub enum Expression {
-    NumberLiteral(NumberLiteral),
+    IntegerLiteral(IntegerLiteral),
+    FloatingLiteral(FloatingLiteral),
 }
 
 #[derive(Debug)]
-pub struct NumberLiteral {
+pub struct IntegerLiteral {
     pub loc: Span,
     pub value: i64,
+}
+
+#[derive(Debug)]
+pub struct FloatingLiteral {
+    pub loc: Span,
+    pub value: f64,
 }
 
 impl Unit {

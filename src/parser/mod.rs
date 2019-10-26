@@ -4,7 +4,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while, take_while1},
     character::complete::char,
-    combinator::{all_consuming, cut, map, opt},
+    combinator::{all_consuming, cut, map, map_res, opt},
     error::{context, ParseError, VerboseError},
     multi::{many0, many1, separated_list},
     sequence::{delimited, preceded, separated_pair, terminated, tuple},
@@ -65,13 +65,63 @@ fn type_reference(i: Span) -> Res<TypeReference> {
 }
 
 fn block(i: Span) -> Res<Block> {
-    // let p = delimited(spaced(tag("{")), many0(statement), spaced(tag("}")));
-    let p = delimited(spaced(tag("{")), cut(many0(tag("FIXME"))), spaced(tag("}")));
-    map(p, |items| Block { items: Vec::new() })(i)
+    let p = delimited(spaced(tag("{")), cut(many0(statement)), spaced(tag("}")));
+    map(p, |items| Block { items })(i)
 }
 
 fn statement(i: Span) -> Res<Statement> {
-    unimplemented!()
+    spaced(alt((
+        map(var_decl, |vd| Statement::VariableDeclaration(vd)),
+        map(terminated(expression, spaced(tag(";"))), |ex| {
+            Statement::Expression(ex)
+        }),
+    )))(i)
+}
+
+fn var_decl(i: Span) -> Res<VariableDeclaration> {
+    spaced(context("let binding", |i| {
+        let (i, _) = tag("let")(i)?;
+        cut(|i| {
+            let (i, name) = spaced(identifier)(i)?;
+            let (i, typ) = opt(preceded(spaced(tag(":")), spaced(type_reference)))(i)?;
+            let (i, value) = opt(preceded(spaced(tag("=")), spaced(expression)))(i)?;
+            let vd = VariableDeclaration { name, typ, value };
+            Ok((i, vd))
+        })(i)
+    }))(i)
+}
+
+fn expression(i: Span) -> Res<Expression> {
+    spaced(alt((
+        map(float_lit, |fl| Expression::FloatingLiteral(fl)),
+        map(int_lit, |nl| Expression::IntegerLiteral(nl)),
+    )))(i)
+}
+
+fn float_lit(i: Span) -> Res<FloatingLiteral> {
+    let (i, loc) = loc(i)?;
+    let (i, value) = nom::number::complete::double(i)?;
+    let fl = FloatingLiteral { loc, value };
+    Ok((i, fl))
+}
+
+fn int_lit(i: Span) -> Res<IntegerLiteral> {
+    let (i, loc) = loc(i)?;
+    let int_chars = "0123456789";
+
+    map_res(
+        take_while(move |c| int_chars.contains(int_chars)),
+        move |span: Span| match span.slice().parse::<i64>() {
+            Ok(value) => {
+                let il = IntegerLiteral {
+                    loc: loc.clone(),
+                    value,
+                };
+                Ok(il)
+            }
+            Err(_) => Err(nom::Err::Error(nom::error::ErrorKind::Tag)),
+        },
+    )(i)
 }
 
 static VALID_ID_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

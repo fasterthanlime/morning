@@ -1,7 +1,7 @@
 use super::Source;
 use nom::{
-    Compare, CompareResult, FindSubstring, InputIter, InputLength, InputTake, Offset, Slice,
-    UnspecializedInput,
+    AsBytes, Compare, CompareResult, FindSubstring, InputIter, InputLength, InputTake, Offset,
+    Slice, UnspecializedInput,
 };
 use std::fmt;
 use std::ops::{RangeFrom, RangeTo};
@@ -257,6 +257,12 @@ impl Slice<RangeTo<usize>> for Span {
 impl Offset for Span {
     fn offset(&self, second: &Self) -> usize {
         second.offset - self.offset
+    }
+}
+
+impl AsBytes for Span {
+    fn as_bytes(&self) -> &[u8] {
+        return self.slice().as_bytes();
     }
 }
 
