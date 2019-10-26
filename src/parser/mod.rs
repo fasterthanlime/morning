@@ -29,21 +29,27 @@ fn unit_item(i: Span) -> Res<UnitItem> {
 }
 
 fn fn_decl(i: Span) -> Res<FunctionDeclaration> {
-    let (i, _) = spaced(tag("fn"))(i)?;
-    let (i, name) = spaced(identifier)(i)?;
-    let (i, params) = param_list(i)?;
-    let (i, body) = spaced(block)(i)?;
+    spaced(context("fn declaration", |i| {
+        let (i, _) = tag("fn")(i)?;
+        cut(|i| {
+            let (i, name) = spaced(identifier)(i)?;
+            let (i, params) = param_list(i)?;
+            let (i, body) = spaced(block)(i)?;
 
-    let fun = FunctionDeclaration { body, params, name };
-    return Ok((i, fun));
+            let fun = FunctionDeclaration { body, params, name };
+            return Ok((i, fun));
+        })(i)
+    }))(i)
 }
 
 fn param_list(i: Span) -> Res<Vec<Parameter>> {
-    spaced(delimited(
-        tag("("),
-        separated_list(tag(","), spaced(parameter)),
-        tag(")"),
-    ))(i)
+    spaced(context("param list", |i| {
+        delimited(
+            tag("("),
+            cut(separated_list(tag(","), spaced(parameter))),
+            tag(")"),
+        )(i)
+    }))(i)
 }
 
 fn parameter(i: Span) -> Res<Parameter> {
@@ -60,7 +66,7 @@ fn type_reference(i: Span) -> Res<TypeReference> {
 
 fn block(i: Span) -> Res<Block> {
     // let p = delimited(spaced(tag("{")), many0(statement), spaced(tag("}")));
-    let p = delimited(spaced(tag("{")), many0(tag("FIXME")), spaced(tag("}")));
+    let p = delimited(spaced(tag("{")), cut(many0(tag("FIXME"))), spaced(tag("}")));
     map(p, |items| Block { items: Vec::new() })(i)
 }
 

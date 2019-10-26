@@ -1,5 +1,5 @@
  
- // Hey
-  fn main() {
-      // Heyyy
-  }
+// Our main function
+fn main() {
+    let x = 0;
+}
