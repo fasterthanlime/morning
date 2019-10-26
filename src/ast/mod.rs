@@ -7,7 +7,7 @@ pub struct Unit {
 
 #[derive(Debug, Clone)]
 pub enum UnitItem {
-    FunctionDeclaration(FDecl),
+    FDecl(FDecl),
 }
 
 #[derive(Debug, Clone)]
@@ -99,7 +99,7 @@ impl Unit {
 
         for item in items.drain(..) {
             match item {
-                UnitItem::FunctionDeclaration(fun) => file.funs.push(fun),
+                UnitItem::FDecl(fun) => file.funs.push(fun),
             }
         }
 

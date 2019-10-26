@@ -25,7 +25,7 @@ pub fn unit(i: Span) -> Res<Unit> {
 }
 
 fn unit_item(i: Span) -> Res<UnitItem> {
-    map(fn_decl, |f| UnitItem::FunctionDeclaration(f))(i)
+    map(fn_decl, |f| UnitItem::FDecl(f))(i)
 }
 
 fn fn_decl(i: Span) -> Res<FDecl> {

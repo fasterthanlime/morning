@@ -1,5 +1,6 @@
 mod ast;
 mod checker;
+mod ir;
 mod parser;
 
 use clap::{App, Arg};
