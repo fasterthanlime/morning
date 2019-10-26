@@ -28,7 +28,7 @@ fn unit_item(i: Span) -> Res<UnitItem> {
     map(fn_decl, |f| UnitItem::FunctionDeclaration(f))(i)
 }
 
-fn fn_decl(i: Span) -> Res<FunctionDeclaration> {
+fn fn_decl(i: Span) -> Res<FDecl> {
     spaced(context("fn declaration", |i| {
         let (i, _) = tag("fn")(i)?;
         cut(|i| {
@@ -36,13 +36,13 @@ fn fn_decl(i: Span) -> Res<FunctionDeclaration> {
             let (i, params) = param_list(i)?;
             let (i, body) = spaced(block)(i)?;
 
-            let fun = FunctionDeclaration { body, params, name };
+            let fun = FDecl { body, params, name };
             return Ok((i, fun));
         })(i)
     }))(i)
 }
 
-fn param_list(i: Span) -> Res<Vec<Parameter>> {
+fn param_list(i: Span) -> Res<Vec<Param>> {
     spaced(context("param list", |i| {
         delimited(
             tag("("),
@@ -52,20 +52,23 @@ fn param_list(i: Span) -> Res<Vec<Parameter>> {
     }))(i)
 }
 
-fn parameter(i: Span) -> Res<Parameter> {
+fn parameter(i: Span) -> Res<Param> {
     let (i, (name, typ)) = separated_pair(spaced(identifier), tag(":"), spaced(type_reference))(i)?;
 
-    let p = Parameter { name, typ };
+    let p = Param { name, typ };
     Ok((i, p))
 }
 
-fn type_reference(i: Span) -> Res<TypeReference> {
+fn type_reference(i: Span) -> Res<TypeRef> {
     let (i, id) = spaced(identifier)(i)?;
-    Ok((i, TypeReference { id }))
+    Ok((i, TypeRef { id }))
 }
 
 fn block(i: Span) -> Res<Block> {
-    let p = delimited(stag("{"), cut(many0(statement)), stag("}"));
+    let p = spaced(context(
+        "block",
+        delimited(stag("{"), many0(statement), cut(stag("}"))),
+    ));
     map(p, |items| Block { items })(i)
 }
 
@@ -73,7 +76,7 @@ fn statement(i: Span) -> Res<Statement> {
     terminated(
         spaced(alt((
             map(return_st, Statement::Return),
-            map(var_decl, Statement::VariableDeclaration),
+            map(var_decl, Statement::VDecl),
             map(expression, Statement::Expression),
         ))),
         stag(";"),
@@ -89,20 +92,20 @@ fn return_st(i: Span) -> Res<Return> {
     }))(i)
 }
 
-fn var_decl(i: Span) -> Res<VariableDeclaration> {
+fn var_decl(i: Span) -> Res<VDecl> {
     spaced(context("let binding", |i| {
         let (i, _) = tag("let")(i)?;
         cut(|i| {
             let (i, name) = spaced(identifier)(i)?;
             let (i, typ) = opt(preceded(stag(":"), spaced(type_reference)))(i)?;
             let (i, value) = opt(preceded(stag("="), spaced(expression)))(i)?;
-            let vd = VariableDeclaration { name, typ, value };
+            let vd = VDecl { name, typ, value };
             Ok((i, vd))
         })(i)
     }))(i)
 }
 
-fn expression(i: Span) -> Res<Expression> {
+fn expression(i: Span) -> Res<Expr> {
     let (mut i, mut expr) = inner_expression(i)?;
 
     loop {
@@ -117,22 +120,24 @@ fn expression(i: Span) -> Res<Expression> {
     }
 }
 
-fn inner_expression(i: Span) -> Res<Expression> {
+fn inner_expression(i: Span) -> Res<Expr> {
     spaced(alt((
-        map(float_lit, Expression::FloatingLiteral),
-        map(int_lit, Expression::IntegerLiteral),
-        map(identifier, Expression::Identifier),
+        delimited(stag("("), spaced(expression), stag(")")),
+        map(block, Expr::Block),
+        map(float_lit, Expr::FloatLit),
+        map(int_lit, Expr::IntLit),
+        map(identifier, Expr::Identifier),
     )))(i)
 }
 
-fn postfix_expression(lhs: Expression, i: Span) -> Res<Expression> {
+fn postfix_expression(lhs: Expr, i: Span) -> Res<Expr> {
     alt((
-        map(call(&lhs), Expression::Call),
-        map(binary_expression(&lhs), Expression::BinaryExpression),
+        map(call(&lhs), Expr::Call),
+        map(binary_expression(&lhs), Expr::Bexp),
     ))(i)
 }
 
-fn call<'a>(target: &'a Expression) -> impl Fn(Span) -> Res<Call> + 'a {
+fn call<'a>(target: &'a Expr) -> impl Fn(Span) -> Res<Call> + 'a {
     move |i| {
         let (i, args) = delimited(stag("("), separated_list(stag(","), expression), stag(")"))(i)?;
 
@@ -144,29 +149,30 @@ fn call<'a>(target: &'a Expression) -> impl Fn(Span) -> Res<Call> + 'a {
     }
 }
 
-fn binary_expression<'a>(lhs: &'a Expression) -> impl Fn(Span) -> Res<BinaryExpresion> + 'a {
+fn binary_expression<'a>(lhs: &'a Expr) -> impl Fn(Span) -> Res<Bexp> + 'a {
     move |i| {
-        let (i, operator) = spaced(binary_operator)(i)?;
+        let (i, operator) = spaced(binary_operator_ex)(i)?;
         let (i, rhs) = spaced(expression)(i)?;
-        let bo = BinaryExpresion {
-            lhs: Box::new(lhs.clone()),
-            operator,
-            rhs: Box::new(rhs),
-        };
-        Ok((i, bo))
+
+        Ok((i, operator.as_expr(Box::new(lhs.clone()), Box::new(rhs))))
     }
 }
 
-fn binary_operator(i: Span) -> Res<BinaryOperator> {
+fn binary_operator_ex(i: Span) -> Res<BopEx> {
     alt((
-        map(tag("+"), |_| BinaryOperator::Plus),
-        map(tag("-"), |_| BinaryOperator::Minus),
-        map(tag("*"), |_| BinaryOperator::Mul),
-        map(tag("/"), |_| BinaryOperator::Div),
+        map(tag("+="), |_| BopEx::Ass(AssOp::Plus)),
+        map(tag("-="), |_| BopEx::Ass(AssOp::Minus)),
+        map(tag("*="), |_| BopEx::Ass(AssOp::Mul)),
+        map(tag("/="), |_| BopEx::Ass(AssOp::Div)),
+        map(tag("+"), |_| BopEx::Base(Bop::Plus)),
+        map(tag("-"), |_| BopEx::Base(Bop::Minus)),
+        map(tag("*"), |_| BopEx::Base(Bop::Mul)),
+        map(tag("/"), |_| BopEx::Base(Bop::Div)),
+        map(tag("="), |_| BopEx::Base(Bop::Assign)),
     ))(i)
 }
 
-fn float_lit(i: Span) -> Res<FloatingLiteral> {
+fn float_lit(i: Span) -> Res<FloatLit> {
     let (i, slice) = alt((
         recognize(tuple((tag("."), digits))),
         recognize(tuple((digits, tag("."), opt(digits)))),
@@ -174,15 +180,15 @@ fn float_lit(i: Span) -> Res<FloatingLiteral> {
 
     let loc = slice.clone();
     let (_, value) = all_consuming(nom::number::complete::double)(slice)?;
-    let fl = FloatingLiteral { loc, value };
+    let fl = FloatLit { loc, value };
     Ok((i, fl))
 }
 
-fn int_lit(i: Span) -> Res<IntegerLiteral> {
+fn int_lit(i: Span) -> Res<IntLit> {
     map_res(digits, move |span: Span| {
         match span.slice().parse::<i64>() {
             Ok(value) => {
-                let il = IntegerLiteral { loc: span, value };
+                let il = IntLit { loc: span, value };
                 Ok(il)
             }
             Err(_) => Err(nom::Err::Error(nom::error::ErrorKind::Tag)),
@@ -197,10 +203,10 @@ fn digits(i: Span) -> Res<Span> {
 
 static VALID_ID_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-fn identifier(i: Span) -> Res<Identifier> {
+fn identifier(i: Span) -> Res<Id> {
     let (i, span) = take_while1(|c| VALID_ID_CHARS.contains(c))(i)?;
 
-    let id = Identifier::new(span);
+    let id = Id::new(span);
     Ok((i, id))
 }
 

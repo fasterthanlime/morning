@@ -2,31 +2,31 @@ use crate::parser::Span;
 
 #[derive(Debug, Clone)]
 pub struct Unit {
-    pub funs: Vec<FunctionDeclaration>,
+    pub funs: Vec<FDecl>,
 }
 
 #[derive(Debug, Clone)]
 pub enum UnitItem {
-    FunctionDeclaration(FunctionDeclaration),
+    FunctionDeclaration(FDecl),
 }
 
 #[derive(Debug, Clone)]
-pub struct Identifier {
+pub struct Id {
     pub loc: Span,
     pub value: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionDeclaration {
-    pub name: Identifier,
-    pub params: Vec<Parameter>,
+pub struct FDecl {
+    pub name: Id,
+    pub params: Vec<Param>,
     pub body: Block,
 }
 
 #[derive(Debug, Clone)]
-pub struct Parameter {
-    pub name: Identifier,
-    pub typ: TypeReference,
+pub struct Param {
+    pub name: Id,
+    pub typ: TypeRef,
 }
 
 #[derive(Debug, Clone)]
@@ -36,40 +36,41 @@ pub struct Block {
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    VariableDeclaration(VariableDeclaration),
+    VDecl(VDecl),
     Return(Return),
-    Expression(Expression),
+    Expression(Expr),
 }
 
 #[derive(Debug, Clone)]
 pub struct Return {
-    pub expr: Option<Expression>,
+    pub expr: Option<Expr>,
 }
 
 #[derive(Debug, Clone)]
-pub struct VariableDeclaration {
-    pub name: Identifier,
-    pub typ: Option<TypeReference>,
-    pub value: Option<Expression>,
+pub struct VDecl {
+    pub name: Id,
+    pub typ: Option<TypeRef>,
+    pub value: Option<Expr>,
 }
 
 #[derive(Debug, Clone)]
-pub enum Expression {
+pub enum Expr {
     Call(Call),
-    BinaryExpression(BinaryExpresion),
-    Identifier(Identifier),
-    IntegerLiteral(IntegerLiteral),
-    FloatingLiteral(FloatingLiteral),
+    Block(Block),
+    Bexp(Bexp),
+    Identifier(Id),
+    IntLit(IntLit),
+    FloatLit(FloatLit),
 }
 
 #[derive(Debug, Clone)]
-pub struct IntegerLiteral {
+pub struct IntLit {
     pub loc: Span,
     pub value: i64,
 }
 
 #[derive(Debug, Clone)]
-pub struct FloatingLiteral {
+pub struct FloatLit {
     pub loc: Span,
     pub value: f64,
 }
@@ -88,7 +89,7 @@ impl Unit {
     }
 }
 
-impl Identifier {
+impl Id {
     pub fn new(loc: Span) -> Self {
         Self {
             loc: loc.clone(),
@@ -98,27 +99,77 @@ impl Identifier {
 }
 
 #[derive(Debug, Clone)]
-pub struct TypeReference {
-    pub id: Identifier,
+pub struct TypeRef {
+    pub id: Id,
 }
 
 #[derive(Debug, Clone)]
 pub struct Call {
-    pub target: Box<Expression>,
-    pub args: Vec<Expression>,
+    pub target: Box<Expr>,
+    pub args: Vec<Expr>,
 }
 
 #[derive(Debug, Clone)]
-pub struct BinaryExpresion {
-    pub operator: BinaryOperator,
-    pub lhs: Box<Expression>,
-    pub rhs: Box<Expression>,
+pub struct Bexp {
+    pub operator: Bop,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
 }
 
 #[derive(Debug, Clone)]
-pub enum BinaryOperator {
+pub enum Bop {
     Plus,
     Minus,
     Mul,
     Div,
+
+    Assign,
+}
+
+impl Bop {
+    pub fn as_expr(self, lhs: Box<Expr>, rhs: Box<Expr>) -> Bexp {
+        Bexp {
+            lhs,
+            operator: self,
+            rhs,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AssOp {
+    Plus,
+    Minus,
+    Mul,
+    Div,
+}
+
+impl AssOp {
+    pub fn as_operator(self) -> Bop {
+        match self {
+            Self::Plus => Bop::Plus,
+            Self::Minus => Bop::Minus,
+            Self::Mul => Bop::Mul,
+            Self::Div => Bop::Div,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum BopEx {
+    Base(Bop),
+    Ass(AssOp),
+}
+
+impl BopEx {
+    pub fn as_expr(self, lhs: Box<Expr>, rhs: Box<Expr>) -> Bexp {
+        match self {
+            Self::Base(operator) => operator.as_expr(lhs, rhs),
+            Self::Ass(operator) => Bexp {
+                lhs: lhs.clone(),
+                operator: Bop::Assign,
+                rhs: Box::new(Expr::Bexp(operator.as_operator().as_expr(lhs, rhs))),
+            },
+        }
+    }
 }

@@ -1,6 +1,14 @@
- 
 // Our main function
 fn main() {
+    let x = 0;
+    {
+        x += 1;
+        x = x + 1;
+
+        let y = x += 1;
+        let y = (x = x + 1);
+    };
+
     // let x = 43;
     // let y = 3.14;
     // let z = .45;
