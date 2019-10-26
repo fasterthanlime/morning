@@ -37,7 +37,13 @@ pub struct Block {
 #[derive(Debug, Clone)]
 pub enum Statement {
     VariableDeclaration(VariableDeclaration),
+    Return(Return),
     Expression(Expression),
+}
+
+#[derive(Debug, Clone)]
+pub struct Return {
+    pub expr: Option<Expression>,
 }
 
 #[derive(Debug, Clone)]

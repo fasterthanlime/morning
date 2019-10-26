@@ -72,11 +72,21 @@ fn block(i: Span) -> Res<Block> {
 fn statement(i: Span) -> Res<Statement> {
     terminated(
         spaced(alt((
-            map(var_decl, |vd| Statement::VariableDeclaration(vd)),
-            map(expression, |ex| Statement::Expression(ex)),
+            map(return_st, Statement::Return),
+            map(var_decl, Statement::VariableDeclaration),
+            map(expression, Statement::Expression),
         ))),
         stag(";"),
     )(i)
+}
+
+fn return_st(i: Span) -> Res<Return> {
+    let (i, _) = stag("return")(i)?;
+    spaced(context("return statement", |i| {
+        let (i, expr) = opt(expression)(i)?;
+        let ret = Return { expr };
+        Ok((i, ret))
+    }))(i)
 }
 
 fn var_decl(i: Span) -> Res<VariableDeclaration> {
