@@ -35,8 +35,26 @@ pub struct Block {
 }
 
 #[derive(Debug)]
-pub struct Statement {
+pub enum Statement {
+    VariableDeclaration(VariableDeclaration),
+}
+
+#[derive(Debug)]
+pub struct VariableDeclaration {
+    pub name: Identifier,
+    pub typ: Option<TypeReference>,
+    pub value: Option<Expression>,
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    NumberLiteral(NumberLiteral),
+}
+
+#[derive(Debug)]
+pub struct NumberLiteral {
     pub loc: Span,
+    pub value: i64,
 }
 
 impl Unit {
