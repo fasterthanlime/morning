@@ -1,14 +1,34 @@
+#![allow(dead_code)]
+
+use once_cell::sync::Lazy;
 use std::rc::Rc;
+use std::sync::Mutex;
 
 pub struct Func {
     block: Block,
-
-    ops: Vec<Op>,
 }
 
 pub struct Block {
-    // have to reserve enough space for locals
-    locals: Vec<Rc<Local>>,
+    pub head: Rc<Label>,
+    pub locals: Vec<Rc<Local>>,
+    pub ops: Vec<Op>,
+}
+
+pub struct Label {
+    pub name: String,
+}
+
+static LABEL_SEED: Lazy<Mutex<i64>> = Lazy::new(|| Mutex::new(0));
+
+impl Label {
+    pub fn new() -> Self {
+        let mut seed = LABEL_SEED.lock().unwrap();
+        let l = Self {
+            name: format!("label_{}", seed),
+        };
+        *seed += 1;
+        l
+    }
 }
 
 pub struct Local {
@@ -31,17 +51,46 @@ impl Type {
 }
 
 pub enum Op {
-    Store(Store),
+    Mov(Mov),
+    Add(Add),
+    Jge(Jge),
+    Jmp(Jmp),
+    Label(Label),
 }
 
-pub struct Store {
+pub struct Mov {
     pub dst: Location,
     pub src: Location,
 }
 
+pub struct Add {
+    pub lhs: Location,
+    pub rhs: Location,
+}
+
+pub struct Cmp {
+    pub lhs: Location,
+    pub rhs: Location,
+}
+
+pub struct Jge {
+    pub dest: Rc<Label>,
+}
+
+pub struct Jmp {
+    pub dest: Rc<Label>,
+}
+
 pub enum Location {
+    Displaced(Displaced),
     Register(Register),
     Variable(Rc<Local>),
+    Immediate(i64),
+}
+
+pub struct Displaced {
+    pub register: Register,
+    pub displacement: i64,
 }
 
 pub enum Register {

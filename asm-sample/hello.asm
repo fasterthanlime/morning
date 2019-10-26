@@ -12,9 +12,8 @@ _start:
             mov     qword [rbp-16], 0
 loop1:      
             ; y += x
-            mov     rbx, [rbp-8]
             mov     rax, [rbp-16]
-            add     rax, rbx
+            add     rax, [rbp-8]
             mov     [rbp-16], rax
 
             ; x += 1
