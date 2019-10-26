@@ -110,7 +110,7 @@ impl Source {
     }
 }
 
-pub fn parse<P, O>(source: Rc<Source>, p: P) -> Result<O, Error>
+fn do_parse<P, O>(source: Rc<Source>, p: P) -> Result<O, Error>
 where
     P: Fn(Span) -> nom::IResult<Span, O, VerboseError<parser::Span>>,
 {
@@ -129,8 +129,8 @@ where
     }
 }
 
-pub fn parse_file(source: Rc<Source>) -> Result<ast::File, Error> {
-    parse(source, parser::rules::<VerboseError<parser::Span>>)
+pub fn parse(source: Rc<Source>) -> Result<ast::Unit, Error> {
+    do_parse(source, parser::file::<VerboseError<parser::Span>>)
 }
 
 pub struct Diagnostic<'a> {

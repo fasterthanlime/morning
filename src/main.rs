@@ -4,7 +4,7 @@ mod parser;
 
 use clap::{App, Arg};
 
-fn main() {
+fn main() -> Result<(), parser::Error> {
     let matches = App::new("Morning Language")
         .version("0.1.0")
         .author("@fasterthanlime's twitch chat")
@@ -24,7 +24,11 @@ fn main() {
         .get_matches();
 
     let input = matches.value_of("INPUT").unwrap();
-    println!("Should compile {}", input);
+    println!("Compiling: {}", input);
 
-    unimplemented!()
+    let source = parser::Source::from_path(input)?;
+    let file = parser::parse(source)?;
+    println!("AST: {:#?}", file);
+
+    Ok(())
 }

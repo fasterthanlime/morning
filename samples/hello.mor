@@ -1,36 +1,5 @@
-import system.io
-
-fn main ()
-    io.println ("Hello world")
-end
-
-// ------------------
-
-fn print_name (name: String, ...Human)
-    // print a string
-end
-
-// ------------------
-
-print_name (name: "Amos")
-
-// ------------------
-
-type String (
-    data: [u8]
-)
-
-type FoodPref (
-    spicy: bool
-)
-
-type Human (
-    name: String
-    food_pref: FoodPref
-)
-
-let foo = Human (name: "hi", food_pref: (spicy: false))
-print_name foo
-
-main ()
-
+ 
+ // Hey
+  fn main() {
+      // Heyyy
+  }

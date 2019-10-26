@@ -1,30 +1,68 @@
 use crate::parser::Span;
 
-pub struct File {
+#[derive(Debug)]
+pub struct Unit {
+    pub funs: Vec<FunctionDeclaration>,
+}
+
+#[derive(Debug)]
+pub enum UnitItem {
+    FunctionDeclaration(FunctionDeclaration),
+}
+
+#[derive(Debug)]
+pub struct Identifier {
     pub loc: Span,
-    pub imports: Vec<Import>,
+    pub value: String,
 }
 
-pub enum FileItem {
-    Import(Import),
-    Function(Function),
+#[derive(Debug)]
+pub struct FunctionDeclaration {
+    pub name: Identifier,
+    pub params: Vec<Parameter>,
+    pub body: Block,
 }
 
-pub struct Import {
-    pub loc: Span,
-    pub path: String,
+#[derive(Debug)]
+pub struct Parameter {
+    pub name: Identifier,
+    pub typ: TypeReference,
 }
 
-pub struct Function {
-    pub loc: Span,
-    pub name: String,
-    pub body: Vec<Statement>,
+#[derive(Debug)]
+pub struct Block {
+    pub items: Vec<Statement>,
 }
 
+#[derive(Debug)]
 pub struct Statement {
     pub loc: Span,
 }
 
-impl File {
-    pub fn new(loc: Span, items: Vec<FileItem>) {}
+impl Unit {
+    pub fn new(mut items: Vec<UnitItem>) -> Self {
+        let mut file = Unit { funs: Vec::new() };
+
+        for item in items.drain(..) {
+            match item {
+                UnitItem::FunctionDeclaration(fun) => file.funs.push(fun),
+            }
+        }
+
+        file
+    }
+}
+
+impl Identifier {
+    pub fn new(loc: Span) -> Self {
+        Self {
+            loc: loc.clone(),
+            value: loc.slice().into(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TypeReference {
+    pub id: Identifier,
 }
