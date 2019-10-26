@@ -24,12 +24,24 @@ fn main() -> Result<(), parser::Error> {
         )
         .get_matches();
 
-    let input = matches.value_of("INPUT").unwrap();
-    println!("Compiling: {}", input);
+    let _input = matches.value_of("INPUT").unwrap();
+    // println!("Compiling: {}", input);
 
-    let source = parser::Source::from_path(input)?;
-    let file = parser::parse(source)?;
-    println!("AST: {:#?}", file);
+    // let source = parser::Source::from_path(input)?;
+    // let file = parser::parse(source)?;
+    // println!("AST: {:#?}", file);
+
+    {
+        use ir::*;
+
+        let mut main = Func::new();
+        let x = main.blocks[main.entry].add_local("x", Type::I64);
+        dbg!(x);
+        let y = main.blocks[main.entry].add_local("y", Type::I64);
+        dbg!(y);
+
+        println!("{:#?}", main);
+    }
 
     Ok(())
 }

@@ -1,19 +1,73 @@
 #![allow(dead_code)]
 
 use once_cell::sync::Lazy;
-use std::rc::Rc;
 use std::sync::Mutex;
 
+pub type BlockRef = usize;
+pub type LabelRef = (BlockRef, usize);
+pub type LocalRef = (BlockRef, usize);
+
+#[derive(Debug)]
 pub struct Func {
-    block: Block,
+    pub entry: BlockRef,
+    pub blocks: Vec<Block>,
 }
 
+impl Func {
+    pub fn new() -> Self {
+        let blocks = vec![];
+        let mut f = Func { entry: 0, blocks };
+        f.add_block(); // add entry block
+        f
+    }
+
+    pub fn add_block(&mut self) -> BlockRef {
+        let start_owned = Label::new();
+        let block = self.blocks.len();
+        let start: LabelRef = (block, 0);
+        let ops = vec![Op::Label(start)];
+
+        let block_owned = Block {
+            own_ref: block,
+            start,
+            locals: Vec::new(),
+            labels: vec![start_owned],
+            ops,
+        };
+        self.blocks.push(block_owned);
+        block
+    }
+}
+
+#[derive(Debug)]
 pub struct Block {
-    pub head: Rc<Label>,
-    pub locals: Vec<Rc<Local>>,
+    pub own_ref: BlockRef,
+    pub start: LabelRef,
+    pub locals: Vec<Local>,
+    pub labels: Vec<Label>,
     pub ops: Vec<Op>,
 }
 
+impl Block {
+    pub fn add_local<S: Into<String>>(&mut self, name: S, typ: Type) -> LocalRef {
+        let local_owned = Local {
+            name: name.into(),
+            typ,
+        };
+        let local: LocalRef = (self.own_ref, self.locals.len());
+        self.locals.push(local_owned);
+        local
+    }
+
+    pub fn add_label(&mut self) -> LabelRef {
+        let label_owned = Label::new();
+        let label: LocalRef = (self.own_ref, self.labels.len());
+        self.labels.push(label_owned);
+        label
+    }
+}
+
+#[derive(Debug)]
 pub struct Label {
     pub name: String,
 }
@@ -21,7 +75,7 @@ pub struct Label {
 static LABEL_SEED: Lazy<Mutex<i64>> = Lazy::new(|| Mutex::new(0));
 
 impl Label {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let mut seed = LABEL_SEED.lock().unwrap();
         let l = Self {
             name: format!("label_{}", seed),
@@ -31,13 +85,13 @@ impl Label {
     }
 }
 
+#[derive(Debug)]
 pub struct Local {
-    block: Rc<Block>,
-
     name: String,
     typ: Type,
 }
 
+#[derive(Debug)]
 pub enum Type {
     I64,
 }
@@ -50,49 +104,58 @@ impl Type {
     }
 }
 
+#[derive(Debug)]
 pub enum Op {
     Mov(Mov),
     Add(Add),
     Jge(Jge),
     Jmp(Jmp),
-    Label(Label),
+    Label(LabelRef),
 }
 
+#[derive(Debug)]
 pub struct Mov {
     pub dst: Location,
     pub src: Location,
 }
 
+#[derive(Debug)]
 pub struct Add {
     pub lhs: Location,
     pub rhs: Location,
 }
 
+#[derive(Debug)]
 pub struct Cmp {
     pub lhs: Location,
     pub rhs: Location,
 }
 
+#[derive(Debug)]
 pub struct Jge {
-    pub dest: Rc<Label>,
+    pub dst: LabelRef,
 }
 
+#[derive(Debug)]
 pub struct Jmp {
-    pub dest: Rc<Label>,
+    pub dst: LabelRef,
 }
 
+#[derive(Debug)]
 pub enum Location {
     Displaced(Displaced),
     Register(Register),
-    Variable(Rc<Local>),
+    Variable(LocalRef),
     Immediate(i64),
 }
 
+#[derive(Debug)]
 pub struct Displaced {
     pub register: Register,
     pub displacement: i64,
 }
 
+#[derive(Debug)]
 pub enum Register {
     RAX,
     RBX,
