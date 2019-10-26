@@ -189,10 +189,10 @@ fn binary_operator_ex(i: Span) -> Res<BopEx> {
         map(tag("*"), |_| BopEx::Base(Bop::Mul)),
         map(tag("/"), |_| BopEx::Base(Bop::Div)),
         map(tag("="), |_| BopEx::Base(Bop::Assign)),
-        map(tag(">"), |_| BopEx::Base(Bop::Gt)),
         map(tag(">="), |_| BopEx::Base(Bop::GtEq)),
-        map(tag("<"), |_| BopEx::Base(Bop::Lt)),
+        map(tag(">"), |_| BopEx::Base(Bop::Gt)),
         map(tag("<="), |_| BopEx::Base(Bop::LtEq)),
+        map(tag("<"), |_| BopEx::Base(Bop::Lt)),
     ))(i)
 }
 

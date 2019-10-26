@@ -5,10 +5,10 @@ fn main() {
     loop {
         y += x;
         x = x + 1;
-        if x > 10 {
+        if x >= 10 {
             break;
         }
     }
 
-    print(x)
+    print(x);
 }
