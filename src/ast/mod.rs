@@ -51,6 +51,9 @@ pub enum Statement {
     Loop(Loop),
     If(If),
 
+    Continue,
+    Break,
+
     VDecl(VDecl),
     Return(Return),
     Expression(Expr),

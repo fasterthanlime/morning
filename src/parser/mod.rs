@@ -65,10 +65,7 @@ fn type_reference(i: Span) -> Res<TypeRef> {
 }
 
 fn block(i: Span) -> Res<Block> {
-    let p = spaced(context(
-        "block",
-        delimited(stag("{"), many0(statement), cut(stag("}"))),
-    ));
+    let p = spaced(delimited(stag("{"), many0(statement), cut(stag("}"))));
     map(p, |items| Block { items })(i)
 }
 
@@ -79,6 +76,8 @@ fn statement(i: Span) -> Res<Statement> {
         map(if_st, Statement::If),
         terminated(
             spaced(alt((
+                map(stag("break"), |_| Statement::Break),
+                map(stag("continue"), |_| Statement::Continue),
                 map(return_st, Statement::Return),
                 map(var_decl, Statement::VDecl),
                 map(expression, Statement::Expression),

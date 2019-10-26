@@ -206,11 +206,30 @@ impl<'a> DiagnosticBuilder<'a> {
 
 impl<'a> fmt::Display for Diagnostic<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let pos = &self.pos;
+        let mut pos = self.pos.clone();
+        if self.pos.span.slice().starts_with("}") {
+            let span = &self.pos.span;
+            let haystack = &span.source.input[0..span.offset];
+
+            let wsp = " \t\r\n";
+            if let Some(index) = haystack.rfind(|c| !wsp.contains(c)) {
+                let index = index + 1;
+                let new_slice = &haystack[index..];
+
+                let span = Span {
+                    source: span.source.clone(),
+                    offset: index,
+                    len: 1,
+                };
+                pos = span.position();
+            }
+        }
+
         let caret_color = self.caret_color;
         let prefix = self.prefix;
         let message = &self.message;
 
+        let text_line = &pos.span.source.lines[pos.line];
         let loc = format!(
             "{}:{}:{}:",
             pos.span.source.name(),
@@ -218,7 +237,6 @@ impl<'a> fmt::Display for Diagnostic<'a> {
             pos.column + 1
         );
         writeln!(f, "{}{} {}", prefix, loc.bold(), message)?;
-        let text_line = &pos.span.source.lines[pos.line];
         writeln!(f, "{}{}", prefix, text_line.dimmed())?;
 
         writeln!(
