@@ -4,7 +4,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while, take_while1},
     character::complete::char,
-    combinator::{all_consuming, cut, map, map_res, opt},
+    combinator::{all_consuming, cut, map, map_res, opt, recognize},
     error::{context, ParseError, VerboseError},
     multi::{many0, many1, separated_list},
     sequence::{delimited, preceded, separated_pair, terminated, tuple},
@@ -65,7 +65,7 @@ fn type_reference(i: Span) -> Res<TypeReference> {
 }
 
 fn block(i: Span) -> Res<Block> {
-    let p = delimited(spaced(tag("{")), cut(many0(statement)), spaced(tag("}")));
+    let p = delimited(stag("{"), cut(many0(statement)), stag("}"));
     map(p, |items| Block { items })(i)
 }
 
@@ -75,7 +75,7 @@ fn statement(i: Span) -> Res<Statement> {
             map(var_decl, |vd| Statement::VariableDeclaration(vd)),
             map(expression, |ex| Statement::Expression(ex)),
         ))),
-        spaced(tag(";")),
+        stag(";"),
     )(i)
 }
 
@@ -84,8 +84,8 @@ fn var_decl(i: Span) -> Res<VariableDeclaration> {
         let (i, _) = tag("let")(i)?;
         cut(|i| {
             let (i, name) = spaced(identifier)(i)?;
-            let (i, typ) = opt(preceded(spaced(tag(":")), spaced(type_reference)))(i)?;
-            let (i, value) = opt(preceded(spaced(tag("=")), spaced(expression)))(i)?;
+            let (i, typ) = opt(preceded(stag(":"), spaced(type_reference)))(i)?;
+            let (i, value) = opt(preceded(stag("="), spaced(expression)))(i)?;
             let vd = VariableDeclaration { name, typ, value };
             Ok((i, vd))
         })(i)
@@ -93,42 +93,77 @@ fn var_decl(i: Span) -> Res<VariableDeclaration> {
 }
 
 fn expression(i: Span) -> Res<Expression> {
+    let (mut i, mut expr) = inner_expression(i)?;
+
+    loop {
+        match binary_expression(expr.clone(), i.clone()) {
+            Ok((i2, expr2)) => {
+                i = i2;
+                expr = expr2;
+                continue;
+            }
+            Err(_) => return Ok((i, expr)),
+        }
+    }
+}
+
+fn inner_expression(i: Span) -> Res<Expression> {
     spaced(alt((
-        map(float_lit, |fl| Expression::FloatingLiteral(fl)),
-        map(int_lit, |nl| Expression::IntegerLiteral(nl)),
+        map(float_lit, Expression::FloatingLiteral),
+        map(int_lit, Expression::IntegerLiteral),
+        map(identifier, Expression::Identifier),
     )))(i)
 }
 
+fn binary_expression(lhs: Expression, i: Span) -> Res<Expression> {
+    map(call(lhs), Expression::Call)(i)
+}
+
+fn call(target: Expression) -> impl Fn(Span) -> Res<Call> {
+    move |i| {
+        let (i, args) = delimited(stag("("), separated_list(stag(","), expression), stag(")"))(i)?;
+
+        let c = Call {
+            target: Box::new(target.clone()),
+            args,
+        };
+        Ok((i, c))
+    }
+}
+
 fn float_lit(i: Span) -> Res<FloatingLiteral> {
-    let (i, loc) = loc(i)?;
-    let (i, value) = nom::number::complete::double(i)?;
+    let (i, slice) = alt((
+        recognize(tuple((tag("."), digits))),
+        recognize(tuple((digits, tag("."), opt(digits)))),
+    ))(i)?;
+
+    let loc = slice.clone();
+    let (_, value) = all_consuming(nom::number::complete::double)(slice)?;
     let fl = FloatingLiteral { loc, value };
     Ok((i, fl))
 }
 
 fn int_lit(i: Span) -> Res<IntegerLiteral> {
-    let (i, loc) = loc(i)?;
-    let int_chars = "0123456789";
-
-    map_res(
-        take_while(move |c| int_chars.contains(int_chars)),
-        move |span: Span| match span.slice().parse::<i64>() {
+    map_res(digits, move |span: Span| {
+        match span.slice().parse::<i64>() {
             Ok(value) => {
-                let il = IntegerLiteral {
-                    loc: loc.clone(),
-                    value,
-                };
+                let il = IntegerLiteral { loc: span, value };
                 Ok(il)
             }
             Err(_) => Err(nom::Err::Error(nom::error::ErrorKind::Tag)),
-        },
-    )(i)
+        }
+    })(i)
+}
+
+fn digits(i: Span) -> Res<Span> {
+    let int_chars = "0123456789";
+    take_while1(move |c| int_chars.contains(c))(i)
 }
 
 static VALID_ID_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 fn identifier(i: Span) -> Res<Identifier> {
-    let (i, span) = take_while(|c| VALID_ID_CHARS.contains(c))(i)?;
+    let (i, span) = take_while1(|c| VALID_ID_CHARS.contains(c))(i)?;
 
     let id = Identifier::new(span);
     Ok((i, id))
@@ -149,6 +184,10 @@ where
         ))),
         f,
     )
+}
+
+fn stag(s: &'static str) -> impl Fn(Span) -> Res<Span> {
+    spaced(tag(s))
 }
 
 /// Whitespace excluding newlines

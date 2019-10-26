@@ -1,65 +1,67 @@
 use crate::parser::Span;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Unit {
     pub funs: Vec<FunctionDeclaration>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnitItem {
     FunctionDeclaration(FunctionDeclaration),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Identifier {
     pub loc: Span,
     pub value: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionDeclaration {
     pub name: Identifier,
     pub params: Vec<Parameter>,
     pub body: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Parameter {
     pub name: Identifier,
     pub typ: TypeReference,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     pub items: Vec<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     VariableDeclaration(VariableDeclaration),
     Expression(Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VariableDeclaration {
     pub name: Identifier,
     pub typ: Option<TypeReference>,
     pub value: Option<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
+    Call(Call),
+    Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     FloatingLiteral(FloatingLiteral),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntegerLiteral {
     pub loc: Span,
     pub value: i64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FloatingLiteral {
     pub loc: Span,
     pub value: f64,
@@ -88,7 +90,13 @@ impl Identifier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypeReference {
     pub id: Identifier,
+}
+
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub target: Box<Expression>,
+    pub args: Vec<Expression>,
 }
