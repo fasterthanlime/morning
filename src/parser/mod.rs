@@ -73,14 +73,35 @@ fn block(i: Span) -> Res<Block> {
 }
 
 fn statement(i: Span) -> Res<Statement> {
-    terminated(
-        spaced(alt((
-            map(return_st, Statement::Return),
-            map(var_decl, Statement::VDecl),
-            map(expression, Statement::Expression),
-        ))),
-        stag(";"),
-    )(i)
+    alt((
+        map(block, Statement::Block),
+        map(loop_st, Statement::Loop),
+        map(if_st, Statement::If),
+        terminated(
+            spaced(alt((
+                map(return_st, Statement::Return),
+                map(var_decl, Statement::VDecl),
+                map(expression, Statement::Expression),
+            ))),
+            cut(stag(";")),
+        ),
+    ))(i)
+}
+
+fn if_st(i: Span) -> Res<If> {
+    let (i, _) = stag("if")(i)?;
+    spaced(context(
+        "if",
+        map(
+            tuple((spaced(expression), spaced(block))),
+            |(cond, body)| If { cond, body },
+        ),
+    ))(i)
+}
+
+fn loop_st(i: Span) -> Res<Loop> {
+    let (i, _) = stag("loop")(i)?;
+    spaced(context("loop", map(block, |body| Loop { body })))(i)
 }
 
 fn return_st(i: Span) -> Res<Return> {
@@ -169,6 +190,10 @@ fn binary_operator_ex(i: Span) -> Res<BopEx> {
         map(tag("*"), |_| BopEx::Base(Bop::Mul)),
         map(tag("/"), |_| BopEx::Base(Bop::Div)),
         map(tag("="), |_| BopEx::Base(Bop::Assign)),
+        map(tag(">"), |_| BopEx::Base(Bop::Gt)),
+        map(tag(">="), |_| BopEx::Base(Bop::GtEq)),
+        map(tag("<"), |_| BopEx::Base(Bop::Lt)),
+        map(tag("<="), |_| BopEx::Base(Bop::LtEq)),
     ))(i)
 }
 

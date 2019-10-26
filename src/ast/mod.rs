@@ -35,7 +35,22 @@ pub struct Block {
 }
 
 #[derive(Debug, Clone)]
+pub struct Loop {
+    pub body: Block,
+}
+
+#[derive(Debug, Clone)]
+pub struct If {
+    pub cond: Expr,
+    pub body: Block,
+}
+
+#[derive(Debug, Clone)]
 pub enum Statement {
+    Block(Block),
+    Loop(Loop),
+    If(If),
+
     VDecl(VDecl),
     Return(Return),
     Expression(Expr),
@@ -122,6 +137,11 @@ pub enum Bop {
     Minus,
     Mul,
     Div,
+
+    Gt,
+    GtEq,
+    Lt,
+    LtEq,
 
     Assign,
 }
