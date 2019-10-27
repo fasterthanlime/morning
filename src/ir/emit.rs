@@ -198,6 +198,9 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
             })?;
             comment(st, "function epilogue end")?;
         }
+        Op::Comment(ref c) => {
+            comment(st, c.as_ref().map(|s| &s[..]).unwrap_or(""))?;
+        }
     }
 
     Ok(())

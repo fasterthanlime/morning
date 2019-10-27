@@ -282,6 +282,12 @@ impl Position {
     }
 }
 
+impl fmt::Debug for Position {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}:{}", self.span.source.name, self.line, self.column)
+    }
+}
+
 pub fn print_errors(f: &mut fmt::Formatter, e: &VerboseError<Span>) -> fmt::Result {
     let mut errors = e.errors.clone();
     errors.reverse();

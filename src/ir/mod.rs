@@ -210,6 +210,8 @@ pub enum Op {
     Jmp(Jmp),
     Label(LabelRef),
     Ret(Option<Location>),
+
+    Comment(Option<String>),
 }
 
 impl_operand!(
@@ -282,6 +284,10 @@ impl Op {
 
     pub fn ret_some<L: Into<Location>>(l: L) -> Self {
         Self::Ret(Some(l.into()))
+    }
+
+    pub fn comment<N: std::fmt::Debug>(n: N) -> Self {
+        Self::Comment(Some(format!("{:?}", n)))
     }
 }
 
