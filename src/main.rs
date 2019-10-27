@@ -1,9 +1,10 @@
-mod ast;
-mod checker;
-mod ir;
-mod parser;
+pub mod ast;
+pub mod checker;
+pub mod ir;
+pub mod parser;
 
 use clap::{App, Arg};
+use ir::*;
 
 fn main() -> Result<(), parser::Error> {
     let matches = App::new("Morning Language")
@@ -32,13 +33,21 @@ fn main() -> Result<(), parser::Error> {
     // println!("AST: {:#?}", file);
 
     {
-        use ir::*;
-
         let mut main = Func::new();
-        let x = main.blocks[main.entry].add_local("x", Type::I64);
-        dbg!(x);
-        let y = main.blocks[main.entry].add_local("y", Type::I64);
-        dbg!(y);
+
+        {
+            let entry = main.entry.borrow_mut(&mut main);
+            let x = entry.add_local("x", Type::I64);
+            entry.add_op(Op::Mov(Mov {
+                dst: Location::Local(x),
+                src: Location::Immediate(1),
+            }));
+            let y = entry.add_local("y", Type::I64);
+            entry.add_op(Op::Mov(Mov {
+                dst: Location::Local(y),
+                src: Location::Immediate(0),
+            }));
+        }
 
         println!("{:#?}", main);
     }

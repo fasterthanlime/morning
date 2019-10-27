@@ -3,9 +3,44 @@
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
-pub type BlockRef = usize;
-pub type LabelRef = (BlockRef, usize);
-pub type LocalRef = (BlockRef, usize);
+#[derive(Debug, Clone, Copy)]
+pub struct BlockRef(usize);
+
+impl BlockRef {
+    pub fn borrow(self, f: &Func) -> &Block {
+        &f.blocks[self.0]
+    }
+
+    pub fn borrow_mut(self, f: &mut Func) -> &mut Block {
+        &mut f.blocks[self.0]
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LabelRef(BlockRef, usize);
+
+impl LabelRef {
+    pub fn borrow(self, f: &Func) -> &Label {
+        &self.0.borrow(f).labels[self.1]
+    }
+
+    pub fn borrow_mut(self, f: &mut Func) -> &mut Label {
+        &mut self.0.borrow_mut(f).labels[self.1]
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LocalRef(BlockRef, usize);
+
+impl LocalRef {
+    pub fn borrow(self, f: &Func) -> &Local {
+        &self.0.borrow(f).locals[self.1]
+    }
+
+    pub fn borrow_mut(self, f: &mut Func) -> &mut Local {
+        &mut self.0.borrow_mut(f).locals[self.1]
+    }
+}
 
 #[derive(Debug)]
 pub struct Func {
@@ -16,15 +51,18 @@ pub struct Func {
 impl Func {
     pub fn new() -> Self {
         let blocks = vec![];
-        let mut f = Func { entry: 0, blocks };
+        let mut f = Func {
+            entry: BlockRef(0),
+            blocks,
+        };
         f.add_block(); // add entry block
         f
     }
 
     pub fn add_block(&mut self) -> BlockRef {
         let start_owned = Label::new();
-        let block = self.blocks.len();
-        let start: LabelRef = (block, 0);
+        let block = BlockRef(self.blocks.len());
+        let start = LabelRef(block, 0);
         let ops = vec![Op::Label(start)];
 
         let block_owned = Block {
@@ -54,16 +92,20 @@ impl Block {
             name: name.into(),
             typ,
         };
-        let local: LocalRef = (self.own_ref, self.locals.len());
+        let local = LocalRef(self.own_ref, self.locals.len());
         self.locals.push(local_owned);
         local
     }
 
     pub fn add_label(&mut self) -> LabelRef {
         let label_owned = Label::new();
-        let label: LocalRef = (self.own_ref, self.labels.len());
+        let label = LabelRef(self.own_ref, self.labels.len());
         self.labels.push(label_owned);
         label
+    }
+
+    pub fn add_op(&mut self, op: Op) {
+        self.ops.push(op)
     }
 }
 
@@ -145,7 +187,7 @@ pub struct Jmp {
 pub enum Location {
     Displaced(Displaced),
     Register(Register),
-    Variable(LocalRef),
+    Local(LocalRef),
     Immediate(i64),
 }
 
