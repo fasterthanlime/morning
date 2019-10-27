@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+pub mod emit;
+
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 

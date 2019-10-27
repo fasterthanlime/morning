@@ -49,7 +49,11 @@ fn main() -> Result<(), parser::Error> {
             }));
         }
 
-        println!("{:#?}", main);
+        // println!("{:#?}", main);
+
+        let mut buf: Vec<u8> = Vec::new();
+        ir::emit::emit(&mut buf, &main)?;
+        println!("{}", std::str::from_utf8(&buf).unwrap());
     }
 
     Ok(())
