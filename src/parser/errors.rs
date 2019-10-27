@@ -12,7 +12,6 @@ use crate::{ast, parser};
 use parser::Span;
 
 /// A parsing, checking, or emitting error
-#[derive(Debug)]
 pub enum Error {
     IO(std::io::Error),
     Source(SourceError),
@@ -28,6 +27,12 @@ impl<'a> fmt::Display for Error {
             Error::Diag(d) => write!(f, "{}", d),
             Error::Unknown(_) => write!(f, "unknown error"),
         }
+    }
+}
+
+impl<'a> fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }
 

@@ -5,6 +5,7 @@ pub fn _start() {
     loop {
         y += x;
         x += 1;
+
         if x > 10 {
             break;
         }
