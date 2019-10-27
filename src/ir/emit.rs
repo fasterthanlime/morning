@@ -88,21 +88,28 @@ fn emit_func(w: &mut dyn io::Write, f: &Func) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn instruction<F>(w: &mut Stack, name: &str, f: F) -> Result<(), std::io::Error>
+fn instruction<F>(st: &mut Stack, name: &str, f: F) -> Result<(), std::io::Error>
 where
     F: FnOnce(&mut Stack) -> Result<(), std::io::Error>,
 {
-    write!(w, "{}{:<10}", CODE_INDENT, name)?;
-    f(w)?;
-    write!(w, "\n")?;
+    write!(st, "{}{:<10}", CODE_INDENT, name)?;
+    f(st)?;
+    write!(st, "\n")?;
+    Ok(())
+}
+
+fn comment(st: &mut Stack, text: &str) -> Result<(), std::io::Error> {
+    write!(st, "{}; {}\n", CODE_INDENT, text)?;
     Ok(())
 }
 
 fn emit_block(st: &mut Stack, block: BlockRef) -> Result<(), std::io::Error> {
     let block = block.borrow(st.f);
 
+    comment(st, "function prologue start")?;
     emit_op(st, &Op::mov(Reg::RBP, Reg::RSP))?;
     emit_op(st, &Op::sub(Reg::RSP, block.locals_girth(st.f)))?;
+    comment(st, "function prologue end")?;
 
     for op in &block.ops {
         emit_op(st, op)?;
@@ -181,6 +188,7 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
                 emit_op(st, &Op::mov(Reg::RAX, *o))?;
             }
 
+            comment(st, "function epilogue start")?;
             let block = st.top().borrow(st.f);
             emit_op(st, &Op::add(Reg::RSP, block.locals_girth(st.f)))?;
 
@@ -188,6 +196,7 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
                 write!(st, "0")?;
                 Ok(())
             })?;
+            comment(st, "function epilogue end")?;
         }
     }
 

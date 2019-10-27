@@ -68,12 +68,10 @@ impl Func {
     pub fn push_block(&mut self) -> BlockRef {
         let start_owned = Label::new();
         let block = BlockRef(self.blocks.len());
-        let start = LabelRef(block, 0);
-        let ops = vec![Op::Label(start)];
+        let ops = vec![];
 
         let block_owned = Block {
             own_ref: block,
-            start,
             locals: Vec::new(),
             labels: vec![start_owned],
             ops,
@@ -86,7 +84,6 @@ impl Func {
 #[derive(Debug)]
 pub struct Block {
     pub own_ref: BlockRef,
-    pub start: LabelRef,
     pub locals: Vec<Local>,
     pub labels: Vec<Label>,
     pub ops: Vec<Op>,
