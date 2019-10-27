@@ -152,9 +152,11 @@ impl Type {
 pub enum Op {
     Mov(Mov),
     Add(Add),
-    Jge(Jge),
+    Cmp(Cmp),
+    Jg(Jg),
     Jmp(Jmp),
     Label(LabelRef),
+    Ret,
 }
 
 #[derive(Debug)]
@@ -176,7 +178,7 @@ pub struct Cmp {
 }
 
 #[derive(Debug)]
-pub struct Jge {
+pub struct Jg {
     pub dst: LabelRef,
 }
 

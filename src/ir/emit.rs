@@ -1,6 +1,8 @@
 use crate::ir;
 use std::io;
 
+static CODE_INDENT: &'static str = "              ";
+
 struct BlockStack(Vec<ir::BlockRef>);
 
 impl BlockStack {
@@ -46,6 +48,16 @@ pub fn emit(w: &mut dyn io::Write, f: &ir::Func) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+fn instruction<F>(w: &mut dyn io::Write, name: &str, f: F) -> Result<(), std::io::Error>
+where
+    F: FnOnce(&mut dyn io::Write) -> Result<(), std::io::Error>,
+{
+    write!(w, "{}{:<10}", CODE_INDENT, name)?;
+    f(w)?;
+    write!(w, "\n")?;
+    Ok(())
+}
+
 fn emit_block(
     w: &mut dyn io::Write,
     f: &ir::Func,
@@ -54,18 +66,33 @@ fn emit_block(
 ) -> Result<(), std::io::Error> {
     let block = block.borrow(f);
     for op in &block.ops {
-        write!(w, "; {:?}\n", op)?;
         match op {
             ir::Op::Label(ref l) => {
                 let l = l.borrow(f);
                 write!(w, "{}:\n", l.name)?;
             }
             ir::Op::Mov(ref m) => {
-                write!(w, "mov ")?;
-                emit_location(w, f, stack, &m.dst)?;
-                write!(w, ", ")?;
-                emit_location(w, f, stack, &m.src)?;
-                write!(w, "\n")?;
+                instruction(w, "mov", |w| {
+                    emit_location(w, f, stack, &m.dst)?;
+                    write!(w, ", ")?;
+                    emit_location(w, f, stack, &m.src)?;
+                    Ok(())
+                })?;
+            }
+            ir::Op::Cmp(ref c) => {
+                instruction(w, "cmp", |w| {
+                    emit_location(w, f, stack, &c.lhs)?;
+                    write!(w, ", ")?;
+                    emit_location(w, f, stack, &c.rhs)?;
+                    Ok(())
+                })?;
+            }
+            ir::Op::Jg(ref j) => {
+                instruction(w, "jg", |w| {
+                    let l = j.dst.borrow(f);
+                    write!(w, "{}", l.name)?;
+                    Ok(())
+                })?;
             }
             _ => unimplemented!(),
         }

@@ -47,6 +47,12 @@ fn main() -> Result<(), parser::Error> {
                 dst: Location::Local(y),
                 src: Location::Immediate(0),
             }));
+
+            entry.add_op(Op::Cmp(Cmp {
+                lhs: Location::Local(x),
+                rhs: Location::Local(y),
+            }));
+            entry.add_op(Op::Jg(Jg { dst: entry.start }))
         }
 
         // println!("{:#?}", main);
