@@ -46,12 +46,14 @@ impl Stack {
         block.borrow_mut(&mut self.f)
     }
 
-    pub fn push(&mut self, item: Item) {
-        self.items.push(item)
-    }
-
-    pub fn pop(&mut self) {
+    pub fn push<F, R>(&mut self, item: Item, f: F) -> R
+    where
+        F: Fn(&mut Self) -> R,
+    {
+        self.items.push(item);
+        let r = f(self);
         self.items.pop();
+        r
     }
 
     pub fn into_inner(self) -> ir::Func {
@@ -100,22 +102,27 @@ fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
                 }
             }
         }
-        ast::Statement::Loop(_l) => {
+        ast::Statement::Loop(l) => {
             let continue_label = st.block().new_label();
             let break_label = st.block().new_label();
 
             st.block().push_op(continue_label);
 
-            st.push(Item::Loop(Loop {
-                continue_label,
-                break_label,
-            }));
-
-            let block = st.f().push_block();
-            st.push(Item::Block(block));
-
-            st.pop();
-            st.pop();
+            st.push(
+                Item::Loop(Loop {
+                    continue_label,
+                    break_label,
+                }),
+                |st| {
+                    let loop_block = st.f().push_block();
+                    st.block().push_op(loop_block);
+                    st.push(Item::Block(loop_block), |st| {
+                        for stat in &l.body.items {
+                            transform_stat(st, stat);
+                        }
+                    });
+                },
+            );
 
             st.block().push_op(ir::Op::jmp(continue_label));
             st.block().push_op(break_label);

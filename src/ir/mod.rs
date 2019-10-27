@@ -209,6 +209,7 @@ pub enum Op {
     Jg(Jg),
     Jmp(Jmp),
     Label(LabelRef),
+    Block(BlockRef),
     Ret(Option<Location>),
 
     Comment(Option<String>),
@@ -223,6 +224,7 @@ impl_operand!(
     Jg(Jg),
     Jmp(Jmp),
     Label(LabelRef),
+    Block(BlockRef),
 );
 
 impl Op {

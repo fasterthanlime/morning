@@ -3,6 +3,8 @@ use std::io::{self, Write};
 
 static CODE_INDENT: &'static str = "            ";
 
+type Result = std::result::Result<(), io::Error>;
+
 struct Stack<'a> {
     w: &'a mut dyn io::Write,
     f: &'a Func,
@@ -22,12 +24,15 @@ impl<'a> Stack<'a> {
         self.blocks[self.blocks.len() - 1]
     }
 
-    pub fn push(&mut self, b: BlockRef) {
-        self.blocks.push(b)
-    }
-
-    pub fn pop(&mut self) {
+    pub fn push<F, R>(&mut self, b: BlockRef, f: F) -> R
+    where
+        F: Fn(&mut Self) -> R,
+    {
+        self.blocks.push(b);
+        let r = f(self);
+        self.exit_n_blocks(1);
         self.blocks.pop();
+        r
     }
 
     pub fn offset(&self, l: LocalRef) -> i64 {
@@ -49,6 +54,32 @@ impl<'a> Stack<'a> {
 
         offset
     }
+
+    pub fn exit_all_blocks(&mut self) -> Result {
+        let n = self.blocks.len();
+        self.exit_n_blocks(n)
+    }
+
+    pub fn exit_n_blocks(&mut self, n: usize) -> Result {
+        let mut dealloc_size = 0i64;
+        for b in self.blocks.iter().rev().take(n) {
+            dealloc_size += b.borrow(self.f).locals_girth(self.f);
+        }
+
+        emit_op(
+            self,
+            &Op::comment(format!(
+                "exiting {} {}",
+                n,
+                match n {
+                    1 => "block",
+                    _ => "blocks",
+                }
+            )),
+        )?;
+        emit_op(self, &Op::add(Reg::RSP, dealloc_size))?;
+        Ok(())
+    }
 }
 
 impl<'a> io::Write for Stack<'a> {
@@ -61,7 +92,7 @@ impl<'a> io::Write for Stack<'a> {
     }
 }
 
-pub fn emit_all(w: &mut dyn io::Write, funcs: &[&Func]) -> Result<(), std::io::Error> {
+pub fn emit_all(w: &mut dyn io::Write, funcs: &[&Func]) -> Result {
     for f in funcs {
         if f.public {
             write!(w, "{}global {}\n", CODE_INDENT, f.name)?;
@@ -78,19 +109,23 @@ pub fn emit_all(w: &mut dyn io::Write, funcs: &[&Func]) -> Result<(), std::io::E
     Ok(())
 }
 
-fn emit_func(w: &mut dyn io::Write, f: &Func) -> Result<(), std::io::Error> {
+fn emit_func(w: &mut dyn io::Write, f: &Func) -> Result {
     let entry = f.entry;
     let mut st = Stack::new(w, f);
-    st.push(entry);
-    emit_block(&mut st, entry)?;
-    emit_op(&mut st, &Op::Ret(None))?;
+
+    emit_op(&mut st, &Op::mov(Reg::RBP, Reg::RSP))?;
+    st.push(entry, |st| -> Result {
+        emit_block(st, entry)?;
+        emit_op(st, &Op::Ret(None))?;
+        Ok(())
+    })?;
 
     Ok(())
 }
 
-fn instruction<F>(st: &mut Stack, name: &str, f: F) -> Result<(), std::io::Error>
+fn instruction<F>(st: &mut Stack, name: &str, f: F) -> Result
 where
-    F: FnOnce(&mut Stack) -> Result<(), std::io::Error>,
+    F: FnOnce(&mut Stack) -> Result,
 {
     write!(st, "{}{:<10}", CODE_INDENT, name)?;
     f(st)?;
@@ -98,18 +133,16 @@ where
     Ok(())
 }
 
-fn comment(st: &mut Stack, text: &str) -> Result<(), std::io::Error> {
+fn comment(st: &mut Stack, text: &str) -> Result {
     write!(st, "{}; {}\n", CODE_INDENT, text)?;
     Ok(())
 }
 
-fn emit_block(st: &mut Stack, block: BlockRef) -> Result<(), std::io::Error> {
+fn emit_block(st: &mut Stack, block: BlockRef) -> Result {
     let block = block.borrow(st.f);
 
-    comment(st, "function prologue start")?;
-    emit_op(st, &Op::mov(Reg::RBP, Reg::RSP))?;
+    comment(st, "block prologue start")?;
     emit_op(st, &Op::sub(Reg::RSP, block.locals_girth(st.f)))?;
-    comment(st, "function prologue end")?;
 
     for op in &block.ops {
         emit_op(st, op)?;
@@ -118,8 +151,12 @@ fn emit_block(st: &mut Stack, block: BlockRef) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
+fn emit_op(st: &mut Stack, op: &Op) -> Result {
     match op {
+        Op::Block(ref b) => st.push(*b, |st| -> Result {
+            emit_block(st, *b)?;
+            Ok(())
+        })?,
         Op::Label(ref l) => {
             let l = l.borrow(st.f);
             write!(st, "{}:\n", l.name)?;
@@ -188,15 +225,12 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
                 emit_op(st, &Op::mov(Reg::RAX, *o))?;
             }
 
-            comment(st, "function epilogue start")?;
-            let block = st.top().borrow(st.f);
-            emit_op(st, &Op::add(Reg::RSP, block.locals_girth(st.f)))?;
+            st.exit_all_blocks()?;
 
             instruction(st, "ret", |st| {
                 write!(st, "0")?;
                 Ok(())
             })?;
-            comment(st, "function epilogue end")?;
         }
         Op::Comment(ref c) => {
             comment(st, c.as_ref().map(|s| &s[..]).unwrap_or(""))?;
@@ -206,7 +240,7 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn emit_opsize(st: &mut Stack, loc: &Location) -> Result<(), std::io::Error> {
+fn emit_opsize(st: &mut Stack, loc: &Location) -> Result {
     if loc.is_displaced() {
         let op_size = byte_width_to_opsize(loc.byte_width(st.f));
         write!(st, "{} ", op_size)?;
@@ -214,7 +248,7 @@ fn emit_opsize(st: &mut Stack, loc: &Location) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn emit_location(st: &mut Stack, loc: &Location) -> Result<(), std::io::Error> {
+fn emit_location(st: &mut Stack, loc: &Location) -> Result {
     match loc {
         Location::Register(r) => r.write_nasm_name(st)?,
         Location::Local(l) => {
