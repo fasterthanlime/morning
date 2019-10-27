@@ -21,6 +21,7 @@ pub struct FDecl {
     pub name: Id,
     pub params: Vec<Param>,
     pub body: Block,
+    pub public: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -61,17 +61,24 @@ impl<'a> io::Write for Stack<'a> {
     }
 }
 
-pub fn emit_main(w: &mut dyn io::Write, f: &Func) -> Result<(), std::io::Error> {
-    write!(w, "{}global _start\n", CODE_INDENT)?;
+pub fn emit_all(w: &mut dyn io::Write, funcs: &[&Func]) -> Result<(), std::io::Error> {
+    for f in funcs {
+        if f.public {
+            write!(w, "{}global {}\n", CODE_INDENT, f.name)?;
+        }
+    }
+
     write!(w, "{}section .text\n", CODE_INDENT)?;
 
-    write!(w, "_start:\n")?;
+    for f in funcs {
+        write!(w, "{}:\n", f.name)?;
+        emit_func(w, f)?;
+    }
 
-    emit(w, f)?;
     Ok(())
 }
 
-pub fn emit(w: &mut dyn io::Write, f: &Func) -> Result<(), std::io::Error> {
+fn emit_func(w: &mut dyn io::Write, f: &Func) -> Result<(), std::io::Error> {
     let entry = f.entry;
     let mut st = Stack::new(w, f);
     st.push(entry);

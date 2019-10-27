@@ -21,7 +21,12 @@ pub use span::*;
 pub type Res<T> = IResult<Span, T, VerboseError<Span>>;
 
 pub fn unit(i: Span) -> Res<Unit> {
-    map(many0(unit_item), move |items| Unit::new(items))(i)
+    all_consuming(terminated(
+        map(many0(unit_item), move |items| Unit::new(items)),
+        // FIXME: that looks big dumb, but it eats up
+        // trailing whitespace so all_consuming is happy..
+        spaced(tag("")),
+    ))(i)
 }
 
 fn unit_item(i: Span) -> Res<UnitItem> {
@@ -30,13 +35,19 @@ fn unit_item(i: Span) -> Res<UnitItem> {
 
 fn fn_decl(i: Span) -> Res<FDecl> {
     spaced(context("fn declaration", |i| {
-        let (i, _) = tag("fn")(i)?;
-        cut(|i| {
+        let (i, public) = opt(stag("pub"))(i)?;
+        let (i, _) = stag("fn")(i)?;
+        cut(move |i| {
             let (i, name) = spaced(identifier)(i)?;
             let (i, params) = param_list(i)?;
             let (i, body) = spaced(block)(i)?;
 
-            let fun = FDecl { body, params, name };
+            let fun = FDecl {
+                body,
+                params,
+                name,
+                public: public.is_some(),
+            };
             return Ok((i, fun));
         })(i)
     }))(i)
@@ -225,7 +236,7 @@ fn digits(i: Span) -> Res<Span> {
     take_while1(move |c| int_chars.contains(c))(i)
 }
 
-static VALID_ID_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+static VALID_ID_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
 
 fn identifier(i: Span) -> Res<Id> {
     let (i, span) = take_while1(|c| VALID_ID_CHARS.contains(c))(i)?;

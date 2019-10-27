@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod checker;
 pub mod ir;
+pub mod middle;
 pub mod parser;
 
 use clap::{App, Arg};
@@ -29,50 +30,12 @@ fn main() -> Result<(), parser::Error> {
     println!("Compiling: {}", input);
 
     let source = parser::Source::from_path(input)?;
-    let file = parser::parse(source)?;
-    println!("AST: {:#?}", file);
+    let unit = parser::parse(source)?;
+    println!("AST: {:#?}", unit);
 
     {
-        let mut main = Func::new();
-
-        {
-            let entry = main.entry.borrow_mut(&mut main);
-
-            // let x = 1
-            let x = entry.push_local("x", Type::I64);
-            entry.push_op(Op::mov(x, 1));
-
-            // let y = 0
-            let y = entry.push_local("y", Type::I64);
-            entry.push_op(Op::mov(y, 0));
-
-            // loop
-            let loopstart = entry.new_label();
-            let loopend = entry.new_label();
-
-            entry.push_op(loopstart);
-
-            // y += x
-            entry.push_op(Op::add(y, x));
-
-            // x += 1
-            entry.push_op(Op::add(x, 1));
-
-            // if x > 10
-            entry.push_op(Op::cmp(x, 10));
-
-            // break
-            entry.push_op(Op::jg(loopend));
-            // continue (implicit)
-            entry.push_op(Op::jmp(loopstart));
-
-            entry.push_op(loopend);
-            entry.push_op(Op::ret_some(y));
-        }
-
         let mut buf: Vec<u8> = Vec::new();
-        ir::emit::emit_main(&mut buf, &main)?;
-        // println!("{}", std::str::from_utf8(&buf).unwrap());
+        middle::transform(&mut buf, &unit)?;
 
         let asm_path = "./samples/hello.asm";
         std::fs::write(asm_path, buf)?;
@@ -113,4 +76,47 @@ fn main() -> Result<(), parser::Error> {
     }
 
     Ok(())
+}
+
+#[allow(dead_code)]
+fn manual_ir() -> ir::Func {
+    let mut main = Func::new("_start");
+    main.public = true;
+
+    {
+        let entry = main.entry.borrow_mut(&mut main);
+
+        // let x = 1
+        let x = entry.push_local("x", Type::I64);
+        entry.push_op(Op::mov(x, 1));
+
+        // let y = 0
+        let y = entry.push_local("y", Type::I64);
+        entry.push_op(Op::mov(y, 0));
+
+        // loop
+        let loopstart = entry.new_label();
+        let loopend = entry.new_label();
+
+        entry.push_op(loopstart);
+
+        // y += x
+        entry.push_op(Op::add(y, x));
+
+        // x += 1
+        entry.push_op(Op::add(x, 1));
+
+        // if x > 10
+        entry.push_op(Op::cmp(x, 10));
+
+        // break
+        entry.push_op(Op::jg(loopend));
+        // continue (implicit)
+        entry.push_op(Op::jmp(loopstart));
+
+        entry.push_op(loopend);
+        entry.push_op(Op::ret_some(y));
+    }
+
+    main
 }

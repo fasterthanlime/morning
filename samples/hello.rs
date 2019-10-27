@@ -1,5 +1,4 @@
-// Our main function
-fn main() {
+pub fn _start() {
     let x = 1;
     let y = 0;
 

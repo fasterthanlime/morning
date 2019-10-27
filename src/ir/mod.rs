@@ -46,14 +46,18 @@ impl LocalRef {
 
 #[derive(Debug)]
 pub struct Func {
+    pub public: bool,
+    pub name: String,
     pub entry: BlockRef,
     pub blocks: Vec<Block>,
 }
 
 impl Func {
-    pub fn new() -> Self {
+    pub fn new<S: Into<String>>(name: S) -> Self {
         let blocks = vec![];
         let mut f = Func {
+            name: name.into(),
+            public: false,
             entry: BlockRef(0),
             blocks,
         };
