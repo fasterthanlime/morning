@@ -140,8 +140,12 @@ pub enum Type {
     I64,
 }
 
-impl Type {
-    pub fn byte_width(&self) -> i64 {
+pub trait Girthy {
+    fn byte_width(&self, f: &Func) -> i64;
+}
+
+impl Girthy for Type {
+    fn byte_width(&self, f: &Func) -> i64 {
         match self {
             Self::I64 => 8,
         }
@@ -192,7 +196,22 @@ pub enum Location {
     Displaced(Displaced),
     Register(Register),
     Local(LocalRef),
-    Immediate(i64),
+    Imm64(i64),
+}
+
+impl Girthy for Location {
+    fn byte_width(&self, f: &Func) -> i64 {
+        match self {
+            Self::Displaced(ref d) => d.register.byte_width(f),
+            Self::Register(ref r) => r.byte_width(f),
+            Self::Local(ref l) => {
+                let l = l.borrow(f);
+                l.typ.byte_width(f)
+            }
+            Self::Imm64(_) => 8,
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -219,4 +238,37 @@ pub enum Register {
     R13,
     R14,
     R15,
+}
+
+impl Girthy for Register {
+    fn byte_width(&self, f: &Func) -> i64 {
+        match self {
+            Self::RAX
+            | Self::RBX
+            | Self::RCX
+            | Self::RDX
+            | Self::RSI
+            | Self::RDI
+            | Self::RBP
+            | Self::RSP
+            | Self::R8
+            | Self::R9
+            | Self::R10
+            | Self::R11
+            | Self::R12
+            | Self::R13
+            | Self::R14
+            | Self::R15 => 8,
+        }
+    }
+}
+
+pub fn byte_width_to_opsize(width: i64) -> &'static str {
+    match width {
+        1 => "byte",
+        2 => "word",
+        4 => "dword",
+        8 => "qword",
+        _ => "<invalid_width>",
+    }
 }

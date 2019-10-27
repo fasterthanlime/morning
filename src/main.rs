@@ -40,12 +40,12 @@ fn main() -> Result<(), parser::Error> {
             let x = entry.add_local("x", Type::I64);
             entry.add_op(Op::Mov(Mov {
                 dst: Location::Local(x),
-                src: Location::Immediate(1),
+                src: Location::Imm64(1),
             }));
             let y = entry.add_local("y", Type::I64);
             entry.add_op(Op::Mov(Mov {
                 dst: Location::Local(y),
-                src: Location::Immediate(0),
+                src: Location::Imm64(0),
             }));
 
             entry.add_op(Op::Cmp(Cmp {

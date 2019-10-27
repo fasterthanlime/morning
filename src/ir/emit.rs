@@ -1,4 +1,5 @@
 use crate::ir;
+use ir::Girthy;
 use std::io;
 
 static CODE_INDENT: &'static str = "              ";
@@ -23,7 +24,7 @@ impl BlockStack {
         for b in &self.0[..self.0.len() - 1] {
             let b = b.borrow(f);
             for l in &b.locals {
-                offset += l.typ.byte_width();
+                offset += l.typ.byte_width(f);
             }
         }
 
@@ -31,7 +32,7 @@ impl BlockStack {
             let b = self.0[self.0.len() - 1];
             let b = b.borrow(f);
             for l in &b.locals[..(l.1 + 1)] {
-                offset += l.typ.byte_width();
+                offset += l.typ.byte_width(f);
             }
         }
 
@@ -87,6 +88,13 @@ fn emit_block(
             }
             ir::Op::Mov(ref m) => {
                 instruction(w, "mov", |w| {
+                    match &m.dst {
+                        ir::Location::Displaced(_) | ir::Location::Local(_) => {
+                            let op_size = ir::byte_width_to_opsize(m.dst.byte_width(f));
+                            write!(w, "{} ", op_size)?;
+                        }
+                        _ => {}
+                    };
                     emit_location(w, f, stack, &m.dst)?;
                     write!(w, ", ")?;
                     emit_location(w, f, stack, &m.src)?;
@@ -123,7 +131,7 @@ fn emit_location(
 ) -> Result<(), std::io::Error> {
     match loc {
         ir::Location::Local(l) => write!(w, "[rbp-{}]", stack.offset(f, *l))?,
-        ir::Location::Immediate(v) => write!(w, "{}", v)?,
+        ir::Location::Imm64(v) => write!(w, "{}", v)?,
         _ => unimplemented!(),
     }
 
