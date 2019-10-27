@@ -1,5 +1,5 @@
 use crate::ir;
-use ir::Girthy;
+use ir::{Girthy, Located};
 use std::io;
 
 static CODE_INDENT: &'static str = "              ";
@@ -55,10 +55,7 @@ pub fn emit(w: &mut dyn io::Write, f: &ir::Func) -> Result<(), std::io::Error> {
     let mut stack = BlockStack::new();
     stack.push(entry);
     emit_block(w, &f, &mut stack, entry)?;
-    instruction(w, "ret", |w| {
-        write!(w, "0")?;
-        Ok(())
-    })?;
+    emit_op(w, f, &mut stack, &ir::Op::Ret(None))?;
 
     Ok(())
 }
@@ -143,6 +140,24 @@ fn emit_op(
                 Ok(())
             })?;
         }
+        ir::Op::Ret(ref l) => {
+            if let Some(l) = l {
+                emit_op(
+                    w,
+                    f,
+                    stack,
+                    &ir::Op::Mov(ir::Mov {
+                        dst: ir::Register::RAX.loc(),
+                        src: *l,
+                    }),
+                )?;
+            }
+
+            instruction(w, "ret", |w| {
+                write!(w, "0")?;
+                Ok(())
+            })?;
+        }
         _ => unimplemented!(),
     }
 
@@ -157,9 +172,26 @@ fn emit_location(
 ) -> Result<(), std::io::Error> {
     match loc {
         ir::Location::Register(r) => r.write_nasm_name(w)?,
-        ir::Location::Local(l) => write!(w, "[rbp-{}]", stack.offset(f, *l))?,
+        ir::Location::Local(l) => {
+            emit_location(
+                w,
+                f,
+                stack,
+                &ir::Register::RBP.displaced(stack.offset(f, *l)),
+            )?;
+        }
+        ir::Location::Displaced(d) => {
+            write!(w, "[")?;
+            d.register.write_nasm_name(w)?;
+
+            if d.displacement > 0 {
+                write!(w, "+{}", d.displacement)?;
+            } else if d.displacement < 0 {
+                write!(w, "-{}", -d.displacement)?;
+            }
+            write!(w, "]")?;
+        }
         ir::Location::Imm64(v) => write!(w, "{}", v)?,
-        _ => unimplemented!(),
     }
 
     Ok(())

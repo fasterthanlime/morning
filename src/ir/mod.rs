@@ -168,7 +168,7 @@ pub enum Op {
     Jg(Jg),
     Jmp(Jmp),
     Label(LabelRef),
-    Ret,
+    Ret(Option<Location>),
 }
 
 #[derive(Debug)]
@@ -199,7 +199,7 @@ pub struct Jmp {
     pub dst: LabelRef,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Location {
     Displaced(Displaced),
     Register(Register),
@@ -221,7 +221,7 @@ impl Girthy for Location {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Displaced {
     pub register: Register,
     pub displacement: i64,
@@ -275,6 +275,36 @@ impl Register {
         let s = format!("{:?}", self);
         write!(w, "{}", s.to_lowercase())?;
         Ok(())
+    }
+}
+pub trait Located {
+    fn loc(self) -> Location;
+}
+
+impl Located for LocalRef {
+    fn loc(self) -> Location {
+        Location::Local(self)
+    }
+}
+
+impl Located for Register {
+    fn loc(self) -> Location {
+        Location::Register(self)
+    }
+}
+
+impl Register {
+    fn displaced(self, displacement: i64) -> Location {
+        Location::Displaced(Displaced {
+            register: self,
+            displacement,
+        })
+    }
+}
+
+impl Located for i64 {
+    fn loc(self) -> Location {
+        Location::Imm64(self)
     }
 }
 
