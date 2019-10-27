@@ -1,4 +1,5 @@
 use crate::{ast, ir};
+use std::collections::HashMap;
 use std::io;
 
 type Result = std::result::Result<(), io::Error>;
@@ -25,7 +26,7 @@ struct Stack {
 
 impl Stack {
     pub fn new(f: ir::Func) -> Self {
-        let items = vec![Item::Block(f.entry)];
+        let items = vec![Scope::new(f.entry).into()];
         Self { f, items }
     }
 
@@ -33,24 +34,27 @@ impl Stack {
         &mut self.f
     }
 
-    pub fn block(&mut self) -> &mut ir::Block {
-        let block = self
-            .items
+    pub fn scope(&mut self) -> &Scope {
+        self.items
             .iter()
             .rev()
             .find_map(|i| match i {
-                Item::Block(b) => Some(b),
+                Item::Scope(s) => Some(s),
                 _ => None,
             })
-            .expect("middle-end stack should always have a block");
-        block.borrow_mut(&mut self.f)
+            .expect("middle-end stack should always have a scope")
     }
 
-    pub fn push<F, R>(&mut self, item: Item, f: F) -> R
+    pub fn block(&mut self) -> &mut ir::Block {
+        self.scope().block.borrow_mut(&mut self.f)
+    }
+
+    pub fn push<F, R, I>(&mut self, item: I, f: F) -> R
     where
         F: Fn(&mut Self) -> R,
+        I: Into<Item>,
     {
-        self.items.push(item);
+        self.items.push(item.into());
         let r = f(self);
         self.items.pop();
         r
@@ -66,12 +70,32 @@ impl Stack {
 
 enum Item {
     Loop(Loop),
-    Block(ir::BlockRef),
+    Scope(Scope),
 }
 
 struct Loop {
     continue_label: ir::LabelRef,
     break_label: ir::LabelRef,
+}
+
+struct Scope {
+    block: ir::BlockRef,
+    names: HashMap<String, ir::LocalRef>,
+}
+
+impl Scope {
+    pub fn new(block: ir::BlockRef) -> Self {
+        Self {
+            block,
+            names: HashMap::new(),
+        }
+    }
+}
+
+impl Into<Item> for Scope {
+    fn into(self) -> Item {
+        Item::Scope(self)
+    }
 }
 
 fn transform_fdecl(af: &ast::FDecl) -> ir::Func {
@@ -126,7 +150,7 @@ fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
                 |st| {
                     let loop_block = st.f().push_block();
                     st.block().push_op(loop_block);
-                    st.push(Item::Block(loop_block), |st| {
+                    st.push(Scope::new(loop_block), |st| {
                         st.block().push_op(continue_label);
                         for stat in &l.body.items {
                             transform_stat(st, stat);
