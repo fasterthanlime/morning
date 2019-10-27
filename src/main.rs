@@ -84,38 +84,39 @@ fn manual_ir() -> ir::Func {
     main.public = true;
 
     {
-        let entry = main.entry.borrow_mut(&mut main);
+        let entry = main.entry;
+        let f = &mut main;
 
         // let x = 1
-        let x = entry.push_local("x", Type::I64);
-        entry.push_op(Op::mov(x, 1));
+        let x = f.push_local("x", Type::I64);
+        entry.push_op(f, Op::mov(x, 1));
 
         // let y = 0
-        let y = entry.push_local("y", Type::I64);
-        entry.push_op(Op::mov(y, 0));
+        let y = f.push_local("y", Type::I64);
+        entry.push_op(f, Op::mov(y, 0));
 
         // loop
-        let loopstart = entry.new_label();
-        let loopend = entry.new_label();
+        let loopstart = entry.new_label(f);
+        let loopend = entry.new_label(f);
 
-        entry.push_op(loopstart);
+        entry.push_op(f, loopstart);
 
         // y += x
-        entry.push_op(Op::add(y, x));
+        entry.push_op(f, Op::add(y, x));
 
         // x += 1
-        entry.push_op(Op::add(x, 1));
+        entry.push_op(f, Op::add(x, 1));
 
         // if x > 10
-        entry.push_op(Op::cmp(x, 10));
+        entry.push_op(f, Op::cmp(x, 10));
 
         // break
-        entry.push_op(Op::jg(loopend));
+        entry.push_op(f, Op::jg(loopend));
         // continue (implicit)
-        entry.push_op(Op::jmp(loopstart));
+        entry.push_op(f, Op::jmp(loopstart));
 
-        entry.push_op(loopend);
-        entry.push_op(Op::ret_some(y));
+        entry.push_op(f, loopend);
+        entry.push_op(f, Op::ret_some(y));
     }
 
     main

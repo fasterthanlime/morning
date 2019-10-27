@@ -30,54 +30,31 @@ impl<'a> Stack<'a> {
     {
         self.blocks.push(b);
         let r = f(self);
-        self.exit_n_blocks(1);
         self.blocks.pop();
         r
     }
 
     pub fn offset(&self, l: LocalRef) -> i64 {
         let mut offset = 0i64;
-        for b in &self.blocks[..self.blocks.len() - 1] {
-            let b = b.borrow(self.f);
-            for l in &b.locals {
-                offset += l.typ.byte_width(self.f);
-            }
-        }
-
-        {
-            let b = self.top();
-            let b = b.borrow(self.f);
-            for l in &b.locals[..(l.1 + 1)] {
-                offset += l.typ.byte_width(self.f);
-            }
+        for l in &self.f.locals[..l.0] {
+            offset += l.typ.byte_width(self.f);
         }
 
         offset
     }
 
-    pub fn exit_all_blocks(&mut self) -> Result {
-        let n = self.blocks.len();
-        self.exit_n_blocks(n)
+    pub fn save_rsp(&mut self) -> Result {
+        emit_op(self, &Op::mov(Reg::RBP, Reg::RSP))?;
+        Ok(())
     }
 
-    pub fn exit_n_blocks(&mut self, n: usize) -> Result {
-        let mut dealloc_size = 0i64;
-        for b in self.blocks.iter().rev().take(n) {
-            dealloc_size += b.borrow(self.f).locals_girth(self.f);
-        }
+    pub fn alloc_locals(&mut self) -> Result {
+        emit_op(self, &Op::sub(Reg::RSP, self.f.locals_stack_size()))?;
+        Ok(())
+    }
 
-        emit_op(
-            self,
-            &Op::comment(format!(
-                "exiting {} {}",
-                n,
-                match n {
-                    1 => "block",
-                    _ => "blocks",
-                }
-            )),
-        )?;
-        emit_op(self, &Op::add(Reg::RSP, dealloc_size))?;
+    pub fn dealloc_locals(&mut self) -> Result {
+        emit_op(self, &Op::add(Reg::RSP, self.f.locals_stack_size()))?;
         Ok(())
     }
 }
@@ -113,7 +90,9 @@ fn emit_func(w: &mut dyn io::Write, f: &Func) -> Result {
     let entry = f.entry;
     let mut st = Stack::new(w, f);
 
-    emit_op(&mut st, &Op::mov(Reg::RBP, Reg::RSP))?;
+    st.save_rsp()?;
+    st.alloc_locals()?;
+
     st.push(entry, |st| -> Result {
         emit_block(st, entry)?;
         emit_op(st, &Op::Ret(None))?;
@@ -140,9 +119,6 @@ fn comment(st: &mut Stack, text: &str) -> Result {
 
 fn emit_block(st: &mut Stack, block: BlockRef) -> Result {
     let block = block.borrow(st.f);
-
-    comment(st, "block prologue start")?;
-    emit_op(st, &Op::sub(Reg::RSP, block.locals_girth(st.f)))?;
 
     for op in &block.ops {
         emit_op(st, op)?;
@@ -225,7 +201,7 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result {
                 emit_op(st, &Op::mov(Reg::RAX, *o))?;
             }
 
-            st.exit_all_blocks()?;
+            st.dealloc_locals()?;
 
             instruction(st, "ret", |st| {
                 write!(st, "0")?;

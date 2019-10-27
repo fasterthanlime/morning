@@ -32,15 +32,15 @@ impl LabelRef {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct LocalRef(BlockRef, usize);
+pub struct LocalRef(usize);
 
 impl LocalRef {
     pub fn borrow(self, f: &Func) -> &Local {
-        &self.0.borrow(f).locals[self.1]
+        &f.locals[self.0]
     }
 
     pub fn borrow_mut(self, f: &mut Func) -> &mut Local {
-        &mut self.0.borrow_mut(f).locals[self.1]
+        &mut f.locals[self.0]
     }
 }
 
@@ -49,6 +49,7 @@ pub struct Func {
     pub public: bool,
     pub name: String,
     pub entry: BlockRef,
+    pub locals: Vec<Local>,
     pub blocks: Vec<Block>,
 }
 
@@ -59,10 +60,21 @@ impl Func {
             name: name.into(),
             public: false,
             entry: BlockRef(0),
+            locals: Vec::new(),
             blocks,
         };
         f.push_block(); // add entry block
         f
+    }
+
+    pub fn push_local<S: Into<String>>(&mut self, name: S, typ: Type) -> LocalRef {
+        let local_owned = Local {
+            name: name.into(),
+            typ,
+        };
+        let local = LocalRef(self.locals.len());
+        self.locals.push(local_owned);
+        local
     }
 
     pub fn push_block(&mut self) -> BlockRef {
@@ -72,34 +84,30 @@ impl Func {
 
         let block_owned = Block {
             own_ref: block,
-            locals: Vec::new(),
             labels: vec![start_owned],
             ops,
         };
         self.blocks.push(block_owned);
         block
     }
+
+    pub fn locals_stack_size(&self) -> i64 {
+        let mut res = 0i64;
+        for l in &self.locals {
+            res += l.typ.byte_width(self);
+        }
+        res
+    }
 }
 
 #[derive(Debug)]
 pub struct Block {
     pub own_ref: BlockRef,
-    pub locals: Vec<Local>,
     pub labels: Vec<Label>,
     pub ops: Vec<Op>,
 }
 
 impl Block {
-    pub fn push_local<S: Into<String>>(&mut self, name: S, typ: Type) -> LocalRef {
-        let local_owned = Local {
-            name: name.into(),
-            typ,
-        };
-        let local = LocalRef(self.own_ref, self.locals.len());
-        self.locals.push(local_owned);
-        local
-    }
-
     pub fn new_label(&mut self) -> LabelRef {
         let label_owned = Label::new();
         let label = LabelRef(self.own_ref, self.labels.len());
@@ -131,13 +139,15 @@ impl Block {
 
         self.ops.push(op)
     }
+}
 
-    pub fn locals_girth(&self, f: &Func) -> i64 {
-        let mut res = 0i64;
-        for l in &self.locals {
-            res += l.typ.byte_width(f);
-        }
-        res
+impl BlockRef {
+    pub fn new_label(self, f: &mut Func) -> LabelRef {
+        self.borrow_mut(f).new_label()
+    }
+
+    pub fn push_op<O: Into<Op>>(self, f: &mut Func, op: O) {
+        self.borrow_mut(f).push_op(op)
     }
 }
 

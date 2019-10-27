@@ -91,7 +91,7 @@ fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
         ast::Statement::VDecl(vd) => {
             st.block()
                 .push_op(ir::Op::comment(format!("vdecl {}", vd.name.value)));
-            let local = st.block().push_local(vd.name.value.clone(), ir::Type::I64);
+            let local = st.f().push_local(vd.name.value.clone(), ir::Type::I64);
 
             if let Some(value) = vd.value.as_ref() {
                 match value {
