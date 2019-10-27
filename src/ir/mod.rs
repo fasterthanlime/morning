@@ -109,11 +109,19 @@ impl Block {
     pub fn push_op<O: Into<Op>>(&mut self, op: O) {
         let op = op.into();
         match op {
-            Op::Add(ref a) => {
-                if a.lhs.is_displaced() && a.rhs.is_displaced() {
-                    self.push_op(Op::mov(Reg::RAX, a.lhs));
-                    self.push_op(Op::add(Reg::RAX, a.rhs));
-                    self.push_op(Op::mov(a.lhs, Reg::RAX));
+            Op::Xor(ref o) => {
+                if o.lhs.is_displaced() && o.rhs.is_displaced() {
+                    self.push_op(Op::mov(Reg::RAX, o.lhs));
+                    self.push_op(Op::xor(Reg::RAX, o.rhs));
+                    self.push_op(Op::mov(o.lhs, Reg::RAX));
+                    return;
+                }
+            }
+            Op::Add(ref o) => {
+                if o.lhs.is_displaced() && o.rhs.is_displaced() {
+                    self.push_op(Op::mov(Reg::RAX, o.lhs));
+                    self.push_op(Op::add(Reg::RAX, o.rhs));
+                    self.push_op(Op::mov(o.lhs, Reg::RAX));
                     return;
                 }
             }
@@ -192,6 +200,7 @@ macro_rules! impl_operand {
 
 #[derive(Debug)]
 pub enum Op {
+    Xor(Xor),
     Mov(Mov),
     Add(Add),
     Cmp(Cmp),
@@ -203,6 +212,7 @@ pub enum Op {
 }
 
 impl_operand!(
+    Xor(Xor),
     Mov(Mov),
     Add(Add),
     Sub(Sub),
@@ -213,6 +223,14 @@ impl_operand!(
 );
 
 impl Op {
+    pub fn xor<L: Into<Location>, R: Into<Location>>(lhs: L, rhs: R) -> Self {
+        Xor {
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+        .into()
+    }
+
     pub fn mov<L: Into<Location>, R: Into<Location>>(lhs: L, rhs: R) -> Self {
         Mov {
             dst: lhs.into(),
@@ -264,6 +282,12 @@ impl Op {
     pub fn ret_some<L: Into<Location>>(l: L) -> Self {
         Self::Ret(Some(l.into()))
     }
+}
+
+#[derive(Debug)]
+pub struct Xor {
+    pub lhs: Location,
+    pub rhs: Location,
 }
 
 #[derive(Debug)]

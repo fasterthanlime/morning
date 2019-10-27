@@ -1,7 +1,7 @@
 use crate::*;
 use std::io::{self, Write};
 
-static CODE_INDENT: &'static str = "              ";
+static CODE_INDENT: &'static str = "            ";
 
 struct Stack<'a> {
     w: &'a mut dyn io::Write,
@@ -109,6 +109,15 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
         Op::Label(ref l) => {
             let l = l.borrow(st.f);
             write!(st, "{}:\n", l.name)?;
+        }
+        Op::Xor(ref o) => {
+            instruction(st, "xor", |st| {
+                emit_opsize(st, &o.lhs)?;
+                emit_location(st, &o.lhs)?;
+                write!(st, ", ")?;
+                emit_location(st, &o.rhs)?;
+                Ok(())
+            })?;
         }
         Op::Add(ref o) => {
             instruction(st, "add", |st| {

@@ -55,8 +55,14 @@ fn main() -> Result<(), parser::Error> {
             // y += x
             entry.push_op(Op::add(y, x));
 
-            // x += 1
-            entry.push_op(Op::add(x, 1));
+            // // x += 1
+            // entry.push_op(Op::add(x, 1));
+
+            let tmp1 = entry.push_local("tmp1", Type::I64);
+            entry.push_op(Op::mov(tmp1, 0));
+            entry.push_op(Op::add(tmp1, 2));
+            entry.push_op(Op::sub(tmp1, 1));
+            entry.push_op(Op::add(x, tmp1));
 
             // if x > 10
             entry.push_op(Op::cmp(x, 10));
@@ -65,8 +71,7 @@ fn main() -> Result<(), parser::Error> {
             entry.push_op(Op::jmp(loopstart));
 
             entry.push_op(loopend);
-            entry.push_op(Op::mov(Reg::RAX, y));
-            entry.push_op(Op::ret_some(Reg::RAX));
+            entry.push_op(Op::ret_some(y));
         }
 
         let mut buf: Vec<u8> = Vec::new();
