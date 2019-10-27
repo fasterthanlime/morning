@@ -25,12 +25,12 @@ fn main() -> Result<(), parser::Error> {
         )
         .get_matches();
 
-    let _input = matches.value_of("INPUT").unwrap();
-    // println!("Compiling: {}", input);
+    let input = matches.value_of("INPUT").unwrap();
+    println!("Compiling: {}", input);
 
-    // let source = parser::Source::from_path(input)?;
-    // let file = parser::parse(source)?;
-    // println!("AST: {:#?}", file);
+    let source = parser::Source::from_path(input)?;
+    let file = parser::parse(source)?;
+    println!("AST: {:#?}", file);
 
     {
         let mut main = Func::new();
@@ -55,19 +55,15 @@ fn main() -> Result<(), parser::Error> {
             // y += x
             entry.push_op(Op::add(y, x));
 
-            // // x += 1
-            // entry.push_op(Op::add(x, 1));
-
-            let tmp1 = entry.push_local("tmp1", Type::I64);
-            entry.push_op(Op::mov(tmp1, 0));
-            entry.push_op(Op::add(tmp1, 2));
-            entry.push_op(Op::sub(tmp1, 1));
-            entry.push_op(Op::add(x, tmp1));
+            // x += 1
+            entry.push_op(Op::add(x, 1));
 
             // if x > 10
             entry.push_op(Op::cmp(x, 10));
 
+            // break
             entry.push_op(Op::jg(loopend));
+            // continue (implicit)
             entry.push_op(Op::jmp(loopstart));
 
             entry.push_op(loopend);

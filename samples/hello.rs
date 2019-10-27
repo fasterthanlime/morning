@@ -11,5 +11,5 @@ fn main() {
         }
     }
 
-    print(x);
+    return y;
 }
