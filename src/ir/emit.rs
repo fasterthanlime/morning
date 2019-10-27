@@ -110,62 +110,58 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
             let l = l.borrow(st.f);
             write!(st, "{}:\n", l.name)?;
         }
-        Op::Add(ref a) => {
+        Op::Add(ref o) => {
             instruction(st, "add", |st| {
-                emit_location(st, &a.lhs)?;
+                emit_opsize(st, &o.lhs)?;
+                emit_location(st, &o.lhs)?;
                 write!(st, ", ")?;
-                emit_location(st, &a.rhs)?;
+                emit_location(st, &o.rhs)?;
                 Ok(())
             })?;
         }
-        Op::Sub(ref s) => {
+        Op::Sub(ref o) => {
             instruction(st, "sub", |st| {
-                emit_location(st, &s.lhs)?;
+                emit_opsize(st, &o.lhs)?;
+                emit_location(st, &o.lhs)?;
                 write!(st, ", ")?;
-                emit_location(st, &s.rhs)?;
+                emit_location(st, &o.rhs)?;
                 Ok(())
             })?;
         }
-        Op::Mov(ref m) => {
+        Op::Mov(ref o) => {
             instruction(st, "mov", |st| {
-                match &m.dst {
-                    Location::Displaced(_) | Location::Local(_) => {
-                        let op_size = byte_width_to_opsize(m.dst.byte_width(st.f));
-                        write!(st, "{} ", op_size)?;
-                    }
-                    _ => {}
-                };
-                emit_location(st, &m.dst)?;
+                emit_opsize(st, &o.dst)?;
+                emit_location(st, &o.dst)?;
                 write!(st, ", ")?;
-                emit_location(st, &m.src)?;
+                emit_location(st, &o.src)?;
                 Ok(())
             })?;
         }
-        Op::Cmp(ref c) => {
+        Op::Cmp(ref o) => {
             instruction(st, "cmp", |st| {
-                emit_location(st, &c.lhs)?;
+                emit_location(st, &o.lhs)?;
                 write!(st, ", ")?;
-                emit_location(st, &c.rhs)?;
+                emit_location(st, &o.rhs)?;
                 Ok(())
             })?;
         }
-        Op::Jg(ref j) => {
+        Op::Jg(ref o) => {
             instruction(st, "jg", |st| {
-                let l = j.dst.borrow(st.f);
+                let l = o.dst.borrow(st.f);
                 write!(st, "{}", l.name)?;
                 Ok(())
             })?;
         }
-        Op::Jmp(ref j) => {
+        Op::Jmp(ref o) => {
             instruction(st, "jmp", |st| {
-                let l = j.dst.borrow(st.f);
+                let l = o.dst.borrow(st.f);
                 write!(st, "{}", l.name)?;
                 Ok(())
             })?;
         }
-        Op::Ret(ref l) => {
-            if let Some(l) = l {
-                emit_op(st, &Op::mov(Reg::RAX, *l))?;
+        Op::Ret(ref o) => {
+            if let Some(o) = o {
+                emit_op(st, &Op::mov(Reg::RAX, *o))?;
             }
 
             let block = st.top().borrow(st.f);
@@ -178,6 +174,14 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
         }
     }
 
+    Ok(())
+}
+
+fn emit_opsize(st: &mut Stack, loc: &Location) -> Result<(), std::io::Error> {
+    if loc.is_displaced() {
+        let op_size = byte_width_to_opsize(loc.byte_width(st.f));
+        write!(st, "{} ", op_size)?;
+    }
     Ok(())
 }
 
