@@ -88,6 +88,18 @@ fn transform_fdecl(af: &ast::FDecl) -> ir::Func {
 
 fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
     match stat {
+        ast::Statement::Expr(ex) => match ex {
+            ast::Expr::Bexp(bexp) => match bexp.operator {
+                ast::Bop::Assign => match bexp.lhs.as_ref() {
+                    ast::Expr::Identifier(_id) => {
+                        st.block().push_op(ir::Op::mov(ir::Reg::RAX, 420));
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
+            _ => {}
+        },
         ast::Statement::VDecl(vd) => {
             st.block()
                 .push_op(ir::Op::comment(format!("vdecl {}", vd.name.value)));

@@ -57,7 +57,7 @@ pub enum Statement {
 
     VDecl(VDecl),
     Return(Return),
-    Expression(Expr),
+    Expr(Expr),
 }
 
 #[derive(Debug, Clone)]

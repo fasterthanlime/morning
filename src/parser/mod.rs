@@ -91,7 +91,7 @@ fn statement(i: Span) -> Res<Statement> {
                 map(stag("continue"), |_| Statement::Continue),
                 map(return_st, Statement::Return),
                 map(var_decl, Statement::VDecl),
-                map(expression, Statement::Expression),
+                map(expression, Statement::Expr),
             ))),
             cut(stag(";")),
         ),
