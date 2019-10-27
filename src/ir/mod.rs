@@ -286,8 +286,8 @@ impl Op {
         Self::Ret(Some(l.into()))
     }
 
-    pub fn comment<N: std::fmt::Debug>(n: N) -> Self {
-        Self::Comment(Some(format!("{:?}", n)))
+    pub fn comment<N: Into<String>>(n: N) -> Self {
+        Self::Comment(Some(n.into()))
     }
 }
 

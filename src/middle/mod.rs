@@ -18,15 +18,19 @@ pub fn transform(w: &mut dyn io::Write, u: &ast::Unit) -> Result {
     Ok(())
 }
 
-struct Stack<'a> {
-    f: &'a mut ir::Func,
+struct Stack {
+    f: ir::Func,
     items: Vec<Item>,
 }
 
-impl<'a> Stack<'a> {
-    pub fn new(f: &'a mut ir::Func) -> Self {
+impl Stack {
+    pub fn new(f: ir::Func) -> Self {
         let items = vec![Item::Block(f.entry)];
         Self { f, items }
+    }
+
+    pub fn f(&mut self) -> &mut ir::Func {
+        &mut self.f
     }
 
     pub fn block(&mut self) -> &mut ir::Block {
@@ -39,7 +43,7 @@ impl<'a> Stack<'a> {
                 _ => None,
             })
             .expect("middle-end stack should always have a block");
-        block.borrow_mut(self.f)
+        block.borrow_mut(&mut self.f)
     }
 
     pub fn push(&mut self, item: Item) {
@@ -49,6 +53,13 @@ impl<'a> Stack<'a> {
     pub fn pop(&mut self) {
         self.items.pop();
     }
+
+    pub fn into_inner(self) -> ir::Func {
+        if self.items.len() != 1 {
+            panic!("middle-end stack should have exactly 1 items at the end of codegen")
+        }
+        self.f
+    }
 }
 
 enum Item {
@@ -57,41 +68,58 @@ enum Item {
 }
 
 struct Loop {
+    continue_label: ir::LabelRef,
     break_label: ir::LabelRef,
-    loop_label: ir::LabelRef,
 }
 
 fn transform_fdecl(af: &ast::FDecl) -> ir::Func {
-    let mut f = ir::Func::new(af.name.value.clone());
+    let mut st = Stack::new(ir::Func::new(af.name.value.clone()));
 
-    for st in &af.body.items {
-        f.entry.borrow_mut(&mut f).push_op(ir::Op::Comment(None));
-
-        match st {
-            ast::Statement::VDecl(vd) => {
-                f.entry
-                    .borrow_mut(&mut f)
-                    .push_op(ir::Op::comment(&vd.name.loc.position()));
-                let local = f
-                    .entry
-                    .borrow_mut(&mut f)
-                    .push_local(vd.name.value.clone(), ir::Type::I64);
-
-                if let Some(value) = vd.value.as_ref() {
-                    match value {
-                        ast::Expr::IntLit(ast::IntLit { value, .. }) => f
-                            .entry
-                            .borrow_mut(&mut f)
-                            .push_op(ir::Op::mov(local, *value)),
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
-        }
+    for stat in &af.body.items {
+        transform_stat(&mut st, stat);
     }
 
-    f
+    st.into_inner()
 }
 
-fn transform_st(af: &ast::FDecl, st: &ast::Statement) {}
+fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
+    st.block().push_op(ir::Op::Comment(None));
+
+    match stat {
+        ast::Statement::VDecl(vd) => {
+            st.block()
+                .push_op(ir::Op::comment(format!("vdecl {}", vd.name.value)));
+            let local = st.block().push_local(vd.name.value.clone(), ir::Type::I64);
+
+            if let Some(value) = vd.value.as_ref() {
+                match value {
+                    ast::Expr::IntLit(ast::IntLit { value, .. }) => {
+                        st.block().push_op(ir::Op::mov(local, *value))
+                    }
+                    _ => {}
+                }
+            }
+        }
+        ast::Statement::Loop(_l) => {
+            let continue_label = st.block().new_label();
+            let break_label = st.block().new_label();
+
+            st.block().push_op(continue_label);
+
+            st.push(Item::Loop(Loop {
+                continue_label,
+                break_label,
+            }));
+
+            let block = st.f().push_block();
+            st.push(Item::Block(block));
+
+            st.pop();
+            st.pop();
+
+            st.block().push_op(ir::Op::jmp(continue_label));
+            st.block().push_op(break_label);
+        }
+        _ => {}
+    }
+}
