@@ -85,8 +85,6 @@ fn transform_fdecl(af: &ast::FDecl) -> ir::Func {
 }
 
 fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
-    st.block().push_op(ir::Op::Comment(None));
-
     match stat {
         ast::Statement::VDecl(vd) => {
             st.block()
@@ -106,8 +104,6 @@ fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
             let continue_label = st.block().new_label();
             let break_label = st.block().new_label();
 
-            st.block().push_op(continue_label);
-
             st.push(
                 Item::Loop(Loop {
                     continue_label,
@@ -117,15 +113,15 @@ fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
                     let loop_block = st.f().push_block();
                     st.block().push_op(loop_block);
                     st.push(Item::Block(loop_block), |st| {
+                        st.block().push_op(continue_label);
                         for stat in &l.body.items {
                             transform_stat(st, stat);
                         }
+                        st.block().push_op(ir::Op::jmp(continue_label));
+                        st.block().push_op(break_label);
                     });
                 },
             );
-
-            st.block().push_op(ir::Op::jmp(continue_label));
-            st.block().push_op(break_label);
         }
         _ => {}
     }
