@@ -153,7 +153,7 @@ pub trait Girthy {
 }
 
 impl Girthy for Type {
-    fn byte_width(&self, f: &Func) -> i64 {
+    fn byte_width(&self, _f: &Func) -> i64 {
         match self {
             Self::I64 => 8,
         }
@@ -217,7 +217,6 @@ impl Girthy for Location {
                 l.typ.byte_width(f)
             }
             Self::Imm64(_) => 8,
-            _ => unimplemented!(),
         }
     }
 }
@@ -249,7 +248,7 @@ pub enum Register {
 }
 
 impl Girthy for Register {
-    fn byte_width(&self, f: &Func) -> i64 {
+    fn byte_width(&self, _f: &Func) -> i64 {
         match self {
             Self::RAX
             | Self::RBX
