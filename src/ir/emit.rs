@@ -39,11 +39,25 @@ impl BlockStack {
     }
 }
 
+pub fn emit_main(w: &mut dyn io::Write, f: &ir::Func) -> Result<(), std::io::Error> {
+    write!(w, "{}global _start\n", CODE_INDENT)?;
+    write!(w, "{}section .text\n", CODE_INDENT)?;
+
+    write!(w, "_start:\n")?;
+
+    emit(w, f)?;
+    Ok(())
+}
+
 pub fn emit(w: &mut dyn io::Write, f: &ir::Func) -> Result<(), std::io::Error> {
     let entry = f.entry;
     let mut stack = BlockStack::new();
     stack.push(entry);
     emit_block(w, &f, &mut stack, entry)?;
+    instruction(w, "ret", |w| {
+        write!(w, "0")?;
+        Ok(())
+    })?;
 
     Ok(())
 }

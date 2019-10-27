@@ -55,10 +55,8 @@ fn main() -> Result<(), parser::Error> {
             entry.add_op(Op::Jg(Jg { dst: entry.start }))
         }
 
-        // println!("{:#?}", main);
-
         let mut buf: Vec<u8> = Vec::new();
-        ir::emit::emit(&mut buf, &main)?;
+        ir::emit::emit_main(&mut buf, &main)?;
         println!("{}", std::str::from_utf8(&buf).unwrap());
     }
 
