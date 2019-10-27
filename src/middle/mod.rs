@@ -1,16 +1,16 @@
-use crate::{ast, ir};
+use crate::{ast, ir, parser::Error};
 use std::collections::HashMap;
 use std::io;
 
-type Result = std::result::Result<(), io::Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 pub struct File {}
 
-pub fn transform(w: &mut dyn io::Write, u: &ast::Unit) -> Result {
+pub fn transform(w: &mut dyn io::Write, u: &ast::Unit) -> Result<()> {
     let mut funs = Vec::new();
 
     for af in &u.funs {
-        funs.push(transform_fdecl(af));
+        funs.push(transform_fdecl(af)?);
     }
 
     let v: Vec<_> = funs.iter().collect();
@@ -34,9 +34,9 @@ impl Stack {
         &mut self.f
     }
 
-    pub fn scope(&mut self) -> &Scope {
+    pub fn scope(&mut self) -> &mut Scope {
         self.items
-            .iter()
+            .iter_mut()
             .rev()
             .find_map(|i| match i {
                 Item::Scope(s) => Some(s),
@@ -47,6 +47,13 @@ impl Stack {
 
     pub fn block(&mut self) -> &mut ir::Block {
         self.scope().block.borrow_mut(&mut self.f)
+    }
+
+    pub fn lookup(&self, name: &str) -> Option<ir::LocalRef> {
+        self.items.iter().rev().find_map(|i| match i {
+            Item::Scope(s) => s.bindings.get(name).map(|x| *x),
+            _ => None,
+        })
     }
 
     pub fn push<F, R, I>(&mut self, item: I, f: F) -> R
@@ -74,21 +81,25 @@ enum Item {
 }
 
 struct Loop {
-    continue_label: ir::LabelRef,
-    break_label: ir::LabelRef,
+    pub continue_label: ir::LabelRef,
+    pub break_label: ir::LabelRef,
 }
 
 struct Scope {
     block: ir::BlockRef,
-    names: HashMap<String, ir::LocalRef>,
+    bindings: HashMap<String, ir::LocalRef>,
 }
 
 impl Scope {
     pub fn new(block: ir::BlockRef) -> Self {
         Self {
             block,
-            names: HashMap::new(),
+            bindings: HashMap::new(),
         }
+    }
+
+    pub fn add_binding<N: Into<String>>(&mut self, name: N, local: ir::LocalRef) {
+        self.bindings.insert(name.into(), local);
     }
 }
 
@@ -98,24 +109,40 @@ impl Into<Item> for Scope {
     }
 }
 
-fn transform_fdecl(af: &ast::FDecl) -> ir::Func {
+fn transform_fdecl(af: &ast::FDecl) -> Result<ir::Func> {
     let mut f = ir::Func::new(af.name.value.clone());
     f.public = af.public;
     let mut st = Stack::new(f);
 
     for stat in &af.body.items {
-        transform_stat(&mut st, stat);
+        transform_stat(&mut st, stat)?;
     }
 
-    st.into_inner()
+    Ok(st.into_inner())
 }
 
-fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
+fn transform_stat(st: &mut Stack, stat: &ast::Statement) -> Result<()> {
     match stat {
         ast::Statement::Expr(ex) => match ex {
             ast::Expr::Bexp(bexp) => match bexp.operator {
                 ast::Bop::Assign => match bexp.lhs.as_ref() {
-                    ast::Expr::Identifier(_id) => {
+                    ast::Expr::Identifier(id) => {
+                        if let Some(local) = st.lookup(&id.value) {
+                            st.block().push_op(ir::Op::comment(format!(
+                                "found {:?} at slot {:?}",
+                                &id.value, local
+                            )))
+                        } else {
+                            return Err(Error::Diag(
+                                id.loc
+                                    .position()
+                                    .diag_err(format!(
+                                        "cannot find value `{}` in this scope",
+                                        id.value
+                                    ))
+                                    .build(),
+                            ));
+                        }
                         st.block().push_op(ir::Op::mov(ir::Reg::RAX, 420));
                     }
                     _ => {}
@@ -128,6 +155,7 @@ fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
             st.block()
                 .push_op(ir::Op::comment(format!("vdecl {}", vd.name.value)));
             let local = st.f().push_local(vd.name.value.clone(), ir::Type::I64);
+            st.scope().add_binding(vd.name.value.clone(), local);
 
             if let Some(value) = vd.value.as_ref() {
                 match value {
@@ -147,20 +175,23 @@ fn transform_stat(st: &mut Stack, stat: &ast::Statement) {
                     continue_label,
                     break_label,
                 }),
-                |st| {
+                |st| -> Result<()> {
                     let loop_block = st.f().push_block();
                     st.block().push_op(loop_block);
-                    st.push(Scope::new(loop_block), |st| {
+                    st.push(Scope::new(loop_block), |st| -> Result<()> {
                         st.block().push_op(continue_label);
                         for stat in &l.body.items {
-                            transform_stat(st, stat);
+                            transform_stat(st, stat)?;
                         }
                         st.block().push_op(ir::Op::jmp(continue_label));
                         st.block().push_op(break_label);
-                    });
+                        Ok(())
+                    })?;
+                    Ok(())
                 },
-            );
+            )?;
         }
         _ => {}
     }
+    Ok(())
 }

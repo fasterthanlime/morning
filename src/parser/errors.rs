@@ -8,7 +8,7 @@ use std::iter::repeat;
 use std::path::Path;
 use std::rc::Rc;
 
-use crate::{ast, checker, parser};
+use crate::{ast, parser};
 use parser::Span;
 
 /// A parsing, checking, or emitting error
@@ -16,7 +16,7 @@ use parser::Span;
 pub enum Error {
     IO(std::io::Error),
     Source(SourceError),
-    Checker(checker::Error),
+    Diag(parser::Diagnostic),
     Unknown(UnknownError),
 }
 
@@ -25,7 +25,7 @@ impl<'a> fmt::Display for Error {
         match self {
             Error::IO(e) => write!(f, "{}", e),
             Error::Source(e) => write!(f, "{:#?}", e),
-            Error::Checker(e) => write!(f, "{:#?}", e),
+            Error::Diag(d) => write!(f, "{}", d),
             Error::Unknown(_) => write!(f, "unknown error"),
         }
     }
@@ -63,9 +63,9 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<checker::Error> for Error {
-    fn from(e: checker::Error) -> Self {
-        Error::Checker(e)
+impl From<parser::Diagnostic> for Error {
+    fn from(e: parser::Diagnostic) -> Self {
+        Error::Diag(e)
     }
 }
 
@@ -133,28 +133,29 @@ pub fn parse(source: Rc<Source>) -> Result<ast::Unit, Error> {
     do_parse(source, parser::unit)
 }
 
-pub struct Diagnostic<'a> {
+#[derive(Debug)]
+pub struct Diagnostic {
     pos: Position,
     caret_color: Color,
-    prefix: &'a str,
+    prefix: String,
     message: String,
 }
 
-pub struct DiagnosticBuilder<'a> {
+pub struct DiagnosticBuilder {
     pos: Position,
     caret_color: Color,
-    prefix: &'a str,
+    prefix: String,
     message: Option<String>,
 }
 
 const EMPTY_PREFIX: &str = "";
 
-impl<'a> DiagnosticBuilder<'a> {
+impl DiagnosticBuilder {
     pub fn new(pos: Position) -> Self {
         Self {
             pos: pos.clone(),
             caret_color: Color::Blue,
-            prefix: EMPTY_PREFIX,
+            prefix: EMPTY_PREFIX.into(),
             message: None,
         }
     }
@@ -164,8 +165,8 @@ impl<'a> DiagnosticBuilder<'a> {
         self
     }
 
-    pub fn prefix(mut self, prefix: &'a str) -> Self {
-        self.prefix = prefix;
+    pub fn prefix(mut self, prefix: &str) -> Self {
+        self.prefix = prefix.into();
         self
     }
 
@@ -174,7 +175,7 @@ impl<'a> DiagnosticBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> Diagnostic<'a> {
+    pub fn build(self) -> Diagnostic {
         Diagnostic {
             pos: self.pos,
             caret_color: self.caret_color,
@@ -184,7 +185,7 @@ impl<'a> DiagnosticBuilder<'a> {
     }
 }
 
-impl<'a> Diagnostic<'a> {
+impl Diagnostic {
     pub fn print(&self) {
         print!("{}", self)
     }
@@ -194,7 +195,7 @@ impl<'a> Diagnostic<'a> {
     }
 }
 
-impl<'a> DiagnosticBuilder<'a> {
+impl DiagnosticBuilder {
     pub fn print(self) {
         self.build().print()
     }
@@ -204,7 +205,7 @@ impl<'a> DiagnosticBuilder<'a> {
     }
 }
 
-impl<'a> fmt::Display for Diagnostic<'a> {
+impl fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut pos = self.pos.clone();
         if self.pos.span.slice().starts_with("}") {
@@ -226,7 +227,7 @@ impl<'a> fmt::Display for Diagnostic<'a> {
         }
 
         let caret_color = self.caret_color;
-        let prefix = self.prefix;
+        let prefix = &self.prefix;
         let message = &self.message;
 
         let text_line = &pos.span.source.lines[pos.line];
@@ -269,15 +270,15 @@ pub struct Position {
 }
 
 impl Position {
-    fn diag<'a>(&self, message: String) -> DiagnosticBuilder<'a> {
+    fn diag(&self, message: String) -> DiagnosticBuilder {
         DiagnosticBuilder::new(self.clone()).message(message)
     }
 
-    pub fn diag_info<'a>(&self, message: String) -> DiagnosticBuilder<'a> {
+    pub fn diag_info(&self, message: String) -> DiagnosticBuilder {
         self.diag(message).caret_color(Color::Blue)
     }
 
-    pub fn diag_err<'a>(&self, message: String) -> DiagnosticBuilder<'a> {
+    pub fn diag_err(&self, message: String) -> DiagnosticBuilder {
         self.diag(message).caret_color(Color::Red)
     }
 }
