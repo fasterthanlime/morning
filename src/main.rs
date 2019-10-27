@@ -48,8 +48,13 @@ fn main() -> Result<(), parser::Error> {
                 src: Location::Imm64(0),
             }));
 
+            entry.add_op(Op::Mov(Mov {
+                dst: Location::Register(Register::RAX),
+                src: Location::Local(x),
+            }));
+
             entry.add_op(Op::Cmp(Cmp {
-                lhs: Location::Local(x),
+                lhs: Location::Register(Register::RAX),
                 rhs: Location::Local(y),
             }));
             entry.add_op(Op::Jg(Jg { dst: entry.start }))

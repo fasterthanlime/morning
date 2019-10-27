@@ -109,6 +109,14 @@ impl Block {
     pub fn add_op(&mut self, op: Op) {
         self.ops.push(op)
     }
+
+    pub fn locals_girth(&self, f: &Func) -> i64 {
+        let mut res = 0i64;
+        for l in &self.locals {
+            res += l.typ.byte_width(f);
+        }
+        res
+    }
 }
 
 #[derive(Debug)]
@@ -220,7 +228,7 @@ pub struct Displaced {
     pub displacement: i64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Register {
     RAX,
     RBX,
@@ -260,6 +268,14 @@ impl Girthy for Register {
             | Self::R14
             | Self::R15 => 8,
         }
+    }
+}
+
+impl Register {
+    pub fn write_nasm_name(self, w: &mut dyn std::io::Write) -> Result<(), std::io::Error> {
+        let s = format!("{:?}", self);
+        write!(w, "{}", s.to_lowercase())?;
+        Ok(())
     }
 }
 

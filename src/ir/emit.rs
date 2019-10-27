@@ -80,44 +80,70 @@ fn emit_block(
     block: ir::BlockRef,
 ) -> Result<(), std::io::Error> {
     let block = block.borrow(f);
+
+    emit_op(
+        w,
+        f,
+        stack,
+        &ir::Op::Mov(ir::Mov {
+            dst: ir::Location::Register(ir::Register::RBP),
+            src: ir::Location::Register(ir::Register::RSP),
+        }),
+    )?;
+    instruction(w, "sub", |w| {
+        write!(w, "rsp, {}", block.locals_girth(f))?;
+        Ok(())
+    })?;
+
     for op in &block.ops {
-        match op {
-            ir::Op::Label(ref l) => {
-                let l = l.borrow(f);
-                write!(w, "{}:\n", l.name)?;
-            }
-            ir::Op::Mov(ref m) => {
-                instruction(w, "mov", |w| {
-                    match &m.dst {
-                        ir::Location::Displaced(_) | ir::Location::Local(_) => {
-                            let op_size = ir::byte_width_to_opsize(m.dst.byte_width(f));
-                            write!(w, "{} ", op_size)?;
-                        }
-                        _ => {}
-                    };
-                    emit_location(w, f, stack, &m.dst)?;
-                    write!(w, ", ")?;
-                    emit_location(w, f, stack, &m.src)?;
-                    Ok(())
-                })?;
-            }
-            ir::Op::Cmp(ref c) => {
-                instruction(w, "cmp", |w| {
-                    emit_location(w, f, stack, &c.lhs)?;
-                    write!(w, ", ")?;
-                    emit_location(w, f, stack, &c.rhs)?;
-                    Ok(())
-                })?;
-            }
-            ir::Op::Jg(ref j) => {
-                instruction(w, "jg", |w| {
-                    let l = j.dst.borrow(f);
-                    write!(w, "{}", l.name)?;
-                    Ok(())
-                })?;
-            }
-            _ => unimplemented!(),
+        emit_op(w, f, stack, op)?;
+    }
+
+    Ok(())
+}
+
+fn emit_op(
+    w: &mut dyn io::Write,
+    f: &ir::Func,
+    stack: &mut BlockStack,
+    op: &ir::Op,
+) -> Result<(), std::io::Error> {
+    match op {
+        ir::Op::Label(ref l) => {
+            let l = l.borrow(f);
+            write!(w, "{}:\n", l.name)?;
         }
+        ir::Op::Mov(ref m) => {
+            instruction(w, "mov", |w| {
+                match &m.dst {
+                    ir::Location::Displaced(_) | ir::Location::Local(_) => {
+                        let op_size = ir::byte_width_to_opsize(m.dst.byte_width(f));
+                        write!(w, "{} ", op_size)?;
+                    }
+                    _ => {}
+                };
+                emit_location(w, f, stack, &m.dst)?;
+                write!(w, ", ")?;
+                emit_location(w, f, stack, &m.src)?;
+                Ok(())
+            })?;
+        }
+        ir::Op::Cmp(ref c) => {
+            instruction(w, "cmp", |w| {
+                emit_location(w, f, stack, &c.lhs)?;
+                write!(w, ", ")?;
+                emit_location(w, f, stack, &c.rhs)?;
+                Ok(())
+            })?;
+        }
+        ir::Op::Jg(ref j) => {
+            instruction(w, "jg", |w| {
+                let l = j.dst.borrow(f);
+                write!(w, "{}", l.name)?;
+                Ok(())
+            })?;
+        }
+        _ => unimplemented!(),
     }
 
     Ok(())
@@ -130,6 +156,7 @@ fn emit_location(
     loc: &ir::Location,
 ) -> Result<(), std::io::Error> {
     match loc {
+        ir::Location::Register(r) => r.write_nasm_name(w)?,
         ir::Location::Local(l) => write!(w, "[rbp-{}]", stack.offset(f, *l))?,
         ir::Location::Imm64(v) => write!(w, "{}", v)?,
         _ => unimplemented!(),
