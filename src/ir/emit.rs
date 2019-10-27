@@ -139,6 +139,7 @@ fn emit_op(st: &mut Stack, op: &Op) -> Result<(), std::io::Error> {
         }
         Op::Cmp(ref o) => {
             instruction(st, "cmp", |st| {
+                emit_opsize(st, &o.lhs)?;
                 emit_location(st, &o.lhs)?;
                 write!(st, ", ")?;
                 emit_location(st, &o.rhs)?;
