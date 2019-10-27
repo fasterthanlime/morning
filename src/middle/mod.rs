@@ -75,7 +75,9 @@ struct Loop {
 }
 
 fn transform_fdecl(af: &ast::FDecl) -> ir::Func {
-    let mut st = Stack::new(ir::Func::new(af.name.value.clone()));
+    let mut f = ir::Func::new(af.name.value.clone());
+    f.public = af.public;
+    let mut st = Stack::new(f);
 
     for stat in &af.body.items {
         transform_stat(&mut st, stat);
