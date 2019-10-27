@@ -57,11 +57,11 @@ impl Func {
             entry: BlockRef(0),
             blocks,
         };
-        f.add_block(); // add entry block
+        f.push_block(); // add entry block
         f
     }
 
-    pub fn add_block(&mut self) -> BlockRef {
+    pub fn push_block(&mut self) -> BlockRef {
         let start_owned = Label::new();
         let block = BlockRef(self.blocks.len());
         let start = LabelRef(block, 0);
@@ -89,7 +89,7 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn add_local<S: Into<String>>(&mut self, name: S, typ: Type) -> LocalRef {
+    pub fn push_local<S: Into<String>>(&mut self, name: S, typ: Type) -> LocalRef {
         let local_owned = Local {
             name: name.into(),
             typ,
@@ -99,15 +99,15 @@ impl Block {
         local
     }
 
-    pub fn add_label(&mut self) -> LabelRef {
+    pub fn new_label(&mut self) -> LabelRef {
         let label_owned = Label::new();
         let label = LabelRef(self.own_ref, self.labels.len());
         self.labels.push(label_owned);
         label
     }
 
-    pub fn add_op(&mut self, op: Op) {
-        self.ops.push(op)
+    pub fn push_op<O: Into<Op>>(&mut self, op: O) {
+        self.ops.push(op.into())
     }
 
     pub fn locals_girth(&self, f: &Func) -> i64 {
@@ -160,15 +160,97 @@ impl Girthy for Type {
     }
 }
 
+pub trait Operand {
+    fn op(self) -> Op;
+}
+
+macro_rules! impl_operand {
+    ($variant: ident($typ: ident)) => {
+        impl Into<Op> for $typ {
+            fn into(self) -> Op {
+                Op::$variant(self)
+            }
+        }
+    };
+    ($($variant: ident($typ: ident)),*$(,)?) => {
+        $(impl_operand!($variant($typ));)*
+    }
+}
+
 #[derive(Debug)]
 pub enum Op {
     Mov(Mov),
     Add(Add),
     Cmp(Cmp),
+    Sub(Sub),
     Jg(Jg),
     Jmp(Jmp),
     Label(LabelRef),
     Ret(Option<Location>),
+}
+
+impl_operand!(
+    Mov(Mov),
+    Add(Add),
+    Sub(Sub),
+    Cmp(Cmp),
+    Jg(Jg),
+    Jmp(Jmp),
+    Label(LabelRef),
+);
+
+impl Op {
+    pub fn mov<L: Into<Location>, R: Into<Location>>(lhs: L, rhs: R) -> Self {
+        Mov {
+            dst: lhs.into(),
+            src: rhs.into(),
+        }
+        .into()
+    }
+
+    pub fn add<L: Into<Location>, R: Into<Location>>(lhs: L, rhs: R) -> Self {
+        Add {
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+        .into()
+    }
+
+    pub fn sub<L: Into<Location>, R: Into<Location>>(lhs: L, rhs: R) -> Self {
+        Sub {
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+        .into()
+    }
+
+    pub fn cmp<L: Into<Location>, R: Into<Location>>(lhs: L, rhs: R) -> Self {
+        Cmp {
+            lhs: lhs.into(),
+            rhs: rhs.into(),
+        }
+        .into()
+    }
+
+    pub fn jg<D: Into<LabelRef>>(target: D) -> Self {
+        Jg { dst: target.into() }.into()
+    }
+
+    pub fn jmp<D: Into<LabelRef>>(target: D) -> Self {
+        Jmp { dst: target.into() }.into()
+    }
+
+    pub fn label(l: LabelRef) -> Self {
+        l.into()
+    }
+
+    pub fn ret_none() -> Self {
+        Self::Ret(None)
+    }
+
+    pub fn ret_some<L: Into<Location>>(l: L) -> Self {
+        Self::Ret(Some(l.into()))
+    }
 }
 
 #[derive(Debug)]
@@ -179,6 +261,12 @@ pub struct Mov {
 
 #[derive(Debug)]
 pub struct Add {
+    pub lhs: Location,
+    pub rhs: Location,
+}
+
+#[derive(Debug)]
+pub struct Sub {
     pub lhs: Location,
     pub rhs: Location,
 }
@@ -202,7 +290,7 @@ pub struct Jmp {
 #[derive(Debug, Clone, Copy)]
 pub enum Location {
     Displaced(Displaced),
-    Register(Register),
+    Register(Reg),
     Local(LocalRef),
     Imm64(i64),
 }
@@ -223,12 +311,12 @@ impl Girthy for Location {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Displaced {
-    pub register: Register,
+    pub register: Reg,
     pub displacement: i64,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Register {
+pub enum Reg {
     RAX,
     RBX,
     RCX,
@@ -247,7 +335,7 @@ pub enum Register {
     R15,
 }
 
-impl Girthy for Register {
+impl Girthy for Reg {
     fn byte_width(&self, _f: &Func) -> i64 {
         match self {
             Self::RAX
@@ -270,30 +358,27 @@ impl Girthy for Register {
     }
 }
 
-impl Register {
+impl Reg {
     pub fn write_nasm_name(self, w: &mut dyn std::io::Write) -> Result<(), std::io::Error> {
         let s = format!("{:?}", self);
         write!(w, "{}", s.to_lowercase())?;
         Ok(())
     }
 }
-pub trait Located {
-    fn loc(self) -> Location;
-}
 
-impl Located for LocalRef {
-    fn loc(self) -> Location {
+impl Into<Location> for LocalRef {
+    fn into(self) -> Location {
         Location::Local(self)
     }
 }
 
-impl Located for Register {
-    fn loc(self) -> Location {
+impl Into<Location> for Reg {
+    fn into(self) -> Location {
         Location::Register(self)
     }
 }
 
-impl Register {
+impl Reg {
     fn displaced(self, displacement: i64) -> Location {
         Location::Displaced(Displaced {
             register: self,
@@ -302,8 +387,8 @@ impl Register {
     }
 }
 
-impl Located for i64 {
-    fn loc(self) -> Location {
+impl Into<Location> for i64 {
+    fn into(self) -> Location {
         Location::Imm64(self)
     }
 }

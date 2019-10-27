@@ -37,27 +37,40 @@ fn main() -> Result<(), parser::Error> {
 
         {
             let entry = main.entry.borrow_mut(&mut main);
-            let x = entry.add_local("x", Type::I64);
-            entry.add_op(Op::Mov(Mov {
-                dst: Location::Local(x),
-                src: Location::Imm64(1),
-            }));
-            let y = entry.add_local("y", Type::I64);
-            entry.add_op(Op::Mov(Mov {
-                dst: Location::Local(y),
-                src: Location::Imm64(0),
-            }));
 
-            entry.add_op(Op::Mov(Mov {
-                dst: Location::Register(Register::RAX),
-                src: Location::Local(x),
-            }));
+            // let x = 1
+            let x = entry.push_local("x", Type::I64);
+            entry.push_op(Op::mov(x, 1));
 
-            entry.add_op(Op::Cmp(Cmp {
-                lhs: Location::Register(Register::RAX),
-                rhs: Location::Local(y),
-            }));
-            entry.add_op(Op::Jg(Jg { dst: entry.start }))
+            // let y = 0
+            let y = entry.push_local("y", Type::I64);
+            entry.push_op(Op::mov(y, 0));
+
+            // loop
+            let loopstart = entry.new_label();
+            let loopend = entry.new_label();
+
+            entry.push_op(loopstart);
+
+            // y += x
+            entry.push_op(Op::mov(Reg::RAX, y));
+            entry.push_op(Op::add(Reg::RAX, x));
+            entry.push_op(Op::mov(y, Reg::RAX));
+
+            // x += 1
+            entry.push_op(Op::mov(Reg::RAX, x));
+            entry.push_op(Op::add(Reg::RAX, 1));
+            entry.push_op(Op::mov(x, Reg::RAX));
+
+            // if x > 10
+            entry.push_op(Op::mov(Reg::RAX, x));
+            entry.push_op(Op::cmp(Reg::RAX, 10));
+            entry.push_op(Op::jg(loopend));
+            entry.push_op(Op::jmp(loopstart));
+
+            entry.push_op(loopend);
+            entry.push_op(Op::mov(Reg::RAX, y));
+            entry.push_op(Op::ret_some(Reg::RAX));
         }
 
         let mut buf: Vec<u8> = Vec::new();
