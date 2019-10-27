@@ -107,7 +107,20 @@ impl Block {
     }
 
     pub fn push_op<O: Into<Op>>(&mut self, op: O) {
-        self.ops.push(op.into())
+        let op = op.into();
+        match op {
+            Op::Add(ref a) => {
+                if a.lhs.is_displaced() && a.rhs.is_displaced() {
+                    self.push_op(Op::mov(Reg::RAX, a.lhs));
+                    self.push_op(Op::add(Reg::RAX, a.rhs));
+                    self.push_op(Op::mov(a.lhs, Reg::RAX));
+                    return;
+                }
+            }
+            _ => {}
+        }
+
+        self.ops.push(op)
     }
 
     pub fn locals_girth(&self, f: &Func) -> i64 {
@@ -375,6 +388,16 @@ impl Into<Location> for LocalRef {
 impl Into<Location> for Reg {
     fn into(self) -> Location {
         Location::Register(self)
+    }
+}
+
+impl Location {
+    fn is_displaced(self) -> bool {
+        match self {
+            Location::Displaced(_) => true,
+            Location::Local(_) => true,
+            _ => false,
+        }
     }
 }
 

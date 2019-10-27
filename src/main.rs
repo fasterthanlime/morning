@@ -53,9 +53,7 @@ fn main() -> Result<(), parser::Error> {
             entry.push_op(loopstart);
 
             // y += x
-            entry.push_op(Op::mov(Reg::RAX, y));
-            entry.push_op(Op::add(Reg::RAX, x));
-            entry.push_op(Op::mov(y, Reg::RAX));
+            entry.push_op(Op::add(y, x));
 
             // x += 1
             entry.push_op(Op::mov(Reg::RAX, x));
